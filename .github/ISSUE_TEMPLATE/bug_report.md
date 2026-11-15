@@ -6,7 +6,7 @@ about: Report a reproducible desktop or CLI integration bug
 Operating system / architecture / desktop session:
 Display scaling / monitor setup:
 CLI version:
-XianPal version:
+agent-pal version:
 
 Steps to reproduce:
 Expected:

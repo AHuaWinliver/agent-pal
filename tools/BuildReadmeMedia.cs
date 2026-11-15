@@ -11,7 +11,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 
 internal static class BuildReadmeMedia
 {
@@ -34,12 +34,12 @@ internal static class BuildReadmeMedia
     {
         try
         {
-            if (Environment.GetEnvironmentVariable("FUFU_TEST_MODE") != "1" || String.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("FUFU_STATE_DIR")))
+            if (Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") != "1" || String.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR")))
                 throw new InvalidOperationException("README media requires isolated demonstration state.");
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             string assets = args[0], output = args[1], previews = args[2];
-            Environment.SetEnvironmentVariable("XIANPAL_TEST_ASSETS", Path.GetFullPath(assets));
+            Environment.SetEnvironmentVariable("AGENT_PAL_TEST_ASSETS", Path.GetFullPath(assets));
             UiLanguage.Set("en");
             UiLanguageBindings.Initialize();
             Directory.CreateDirectory(output);
@@ -121,7 +121,7 @@ internal static class BuildReadmeMedia
             }
             Panel(g, new RectangleF(68, 58, 251, 40), Color.FromArgb(224, 234, 220), 18);
             Text(g, "AI DESKTOP COMPANION", 17, Ink, 88, 66, true);
-            Text(g, "XianPal", 94, Ink, 62, 142, true);
+            Text(g, "agent-pal", 94, Ink, 62, 142, true);
             Text(g, "AI at your side.", 39, Ink, 68, 278, true);
             Text(g, "Companions for real work.", 26, Muted, 71, 349, false);
             string[] chips = { "4 companions", "Claude Code", "Chat · files · tasks" };
@@ -390,7 +390,7 @@ internal static class BuildReadmeMedia
                 using (Graphics g = Graphics.FromImage(image))
                 {
                     Quality(g); g.Clear(Color.White);
-                    Text(g, "XianPal · 24-phase original animation", 16, Ink, 16, 10, true);
+                    Text(g, "agent-pal · 24-phase original animation", 16, Ink, 16, 10, true);
                     for (int i = 0; i < 4; i++)
                     {
                         g.DrawImage(frames[i][frame], new Rectangle(i * 180 + 2, 34, 176, 191));

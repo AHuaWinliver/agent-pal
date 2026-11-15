@@ -2,7 +2,7 @@
 
 [简体中文](GITHUB-PUBLISH.zh-CN.md)
 
-Repository: [AHuaWinliver/xianpal-ai-companion](https://github.com/AHuaWinliver/xianpal-ai-companion).
+Repository: [AHuaWinliver/agent-pal](https://github.com/AHuaWinliver/agent-pal).
 
 ## Prepare a clean source tree
 

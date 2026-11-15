@@ -1,7 +1,7 @@
-# XianPal 0.6.7 — AI desktop companion source
+# agent-pal 0.6.7 — AI desktop companion source
 
-`XianPal/` contains the Windows desktop application in the `XianPal` namespace;
-`XianPal.Installer/` contains its per-user installer in `XianPal.Installer`.
+`AgentPal/` contains the Windows desktop application in the `agent-pal` namespace;
+`AgentPal.Installer/` contains its per-user installer in `AgentPal.Installer`.
 
 The application preserves the task scheduling, native CLI interaction,
 background-session supervision, virtual desktop, reminder, dialogue and

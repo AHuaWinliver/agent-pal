@@ -51,7 +51,7 @@ public static class OriginalAssetCheck {
     public static void CheckGestures(Type generator,string artRoot) {
         var flags=System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic;var instance=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
         var metadata=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string,int[][]>>(File.ReadAllText(Path.Combine(artRoot,"regions.json")));
-        var type=generator.GetNestedType("Rig",System.Reflection.BindingFlags.NonPublic);var motion=generator.Assembly.GetType("XianPal.CompanionMotion");
+        var type=generator.GetNestedType("Rig",System.Reflection.BindingFlags.NonPublic);var motion=generator.Assembly.GetType("agent-pal.CompanionMotion");
         foreach(string id in new[]{"orbit","spark","moss","pippin"}) {
             object rig=Activator.CreateInstance(type,instance,null,new object[]{Path.Combine(artRoot,id+".png"),metadata[id]},null);
             try {
@@ -79,7 +79,7 @@ public static class OriginalAssetCheck {
         var flags=System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic;
         var instance=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
         var metadata=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string,int[][]>>(File.ReadAllText(Path.Combine(artRoot,"regions.json")));
-        var type=generator.GetNestedType("Rig",System.Reflection.BindingFlags.NonPublic);var motion=generator.Assembly.GetType("XianPal.CompanionMotion");
+        var type=generator.GetNestedType("Rig",System.Reflection.BindingFlags.NonPublic);var motion=generator.Assembly.GetType("agent-pal.CompanionMotion");
         foreach(string id in new[]{"orbit","moss"}) {
             object rig=Activator.CreateInstance(type,instance,null,new object[]{Path.Combine(artRoot,id+".png"),metadata[id]},null);
             try {
@@ -143,7 +143,7 @@ public static class OriginalAssetCheck {
                     if(y>=start*2){if(a.A>=128)before++;if(b.A>=128)after++;}
                 }
                 if(before<100||after>before*.55||after<before*.18)throw new Exception("Turtle neck not reduced appropriately: "+after+" / "+before);
-                var map=generator.Assembly.GetType("XianPal.CompanionMotion").GetMethod("TurtleNeckPoint",flags);
+                var map=generator.Assembly.GetType("agent-pal.CompanionMotion").GetMethod("TurtleNeckPoint",flags);
                 // Sample opaque source neck points through the inverse warp;
                 // no internal mesh seam may become transparent.
                 for(int y=start+2;y<box.Bottom-3;y+=2)for(int x=(int)box.Left+3;x<box.Right-3;x+=2)if(original.GetPixel(x*2,y*2).A>=250) {
@@ -190,7 +190,7 @@ public static class OriginalAssetCheck {
         var flags=System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic;
         var instance=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
         var metadata=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string,int[][]>>(File.ReadAllText(Path.Combine(artRoot,"regions.json")));
-        var rigType=generator.GetNestedType("Rig",System.Reflection.BindingFlags.NonPublic);var motion=generator.Assembly.GetType("XianPal.CompanionMotion");
+        var rigType=generator.GetNestedType("Rig",System.Reflection.BindingFlags.NonPublic);var motion=generator.Assembly.GetType("agent-pal.CompanionMotion");
         foreach(string id in new[]{"orbit","spark","moss","pippin"}) {
             if(id!="pippin"&&Path.GetFileName(artRoot)=="rigs")continue; // Original human art is used only for non-walking states.
             object rig=Activator.CreateInstance(rigType,instance,null,new object[]{Path.Combine(artRoot,id+".png"),metadata[id]},null);
@@ -251,7 +251,7 @@ public static class OriginalAssetCheck {
         var instance=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
         var metadata=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string,int[][]>>(File.ReadAllText(Path.Combine(artRoot,"regions.json")));
         var rigType=generator.GetNestedType("Rig",System.Reflection.BindingFlags.NonPublic);
-        var motion=generator.Assembly.GetType("XianPal.CompanionMotion");
+        var motion=generator.Assembly.GetType("agent-pal.CompanionMotion");
         foreach(string id in new[]{"orbit","spark","moss"}) {
             object rig=Activator.CreateInstance(rigType,instance,null,new object[]{Path.Combine(artRoot,id+".png"),metadata[id]},null);
             try {
@@ -287,7 +287,7 @@ public static class OriginalAssetCheck {
         string torsoRoot=Path.Combine(Path.GetDirectoryName(artRoot),"side-torsos");
         var torsoRegions=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string,int[]>>(File.ReadAllText(Path.Combine(torsoRoot,"regions.json")));
         var rigType=generator.GetNestedType("Rig",System.Reflection.BindingFlags.NonPublic);
-        var motion=generator.Assembly.GetType("XianPal.CompanionMotion");
+        var motion=generator.Assembly.GetType("agent-pal.CompanionMotion");
         foreach(string id in new[]{"orbit","spark","moss"}) {
             object rig=Activator.CreateInstance(rigType,instance,null,new object[]{Path.Combine(artRoot,id+".png"),metadata[id]},null);
             try {
@@ -349,7 +349,7 @@ public static class OriginalAssetCheck {
         }
     }
     public static void CheckNeckSockets(Type generator,string assets) {
-        var motion=generator.Assembly.GetType("XianPal.CompanionMotion");
+        var motion=generator.Assembly.GetType("agent-pal.CompanionMotion");
         var flags=System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic;
         foreach(string id in new[]{"orbit","spark","moss","pippin"})foreach(string state in new[]{"running-left","running-right"})for(int f=0;f<24;f++) {
             double phase=f/24.0,t=phase*Math.PI*2;
@@ -370,7 +370,7 @@ public static class OriginalAssetCheck {
     }
     public static void CheckSleeveMesh(Type generator) {
         var draw=generator.GetMethod("DrawSleeveMesh",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic);
-        var motion=generator.Assembly.GetType("XianPal.CompanionMotion").GetMethod("ArmPath",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic);
+        var motion=generator.Assembly.GetType("agent-pal.CompanionMotion").GetMethod("ArmPath",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic);
         foreach(float angle in new[]{-120f,-45f,0f,18f,105f})
         using(Bitmap source=new Bitmap(60,200))using(Graphics paint=Graphics.FromImage(source))
         using(Bitmap result=new Bitmap(512,512))using(Graphics g=Graphics.FromImage(result)) {

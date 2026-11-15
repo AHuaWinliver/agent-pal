@@ -6,7 +6,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 
 internal static class HallLayoutTests
 {
@@ -31,7 +31,7 @@ internal static class HallLayoutTests
     {
         try
         {
-            Application.EnableVisualStyles();string root=Environment.GetEnvironmentVariable("FUFU_STATE_DIR");Directory.CreateDirectory(root);
+            Application.EnableVisualStyles();string root=Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR");Directory.CreateDirectory(root);
             int samples=0;
             foreach(var viewport in new[]{new Size(600,300),new Size(800,500),new Size(1920,900),new Size(2560,1440)})
             foreach(int count in new[]{0,1,2,4,5,8,12})foreach(float unit in new[]{1f,1.5f,2f})

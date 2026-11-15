@@ -5,7 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 
 internal static class ProfileSettingsTests
 {
@@ -18,8 +18,8 @@ internal static class ProfileSettingsTests
     {
         try
         {
-            if (Environment.GetEnvironmentVariable("FUFU_TEST_MODE") != "1") throw new Exception("Isolated test state required.");
-            Directory.CreateDirectory(XianPal.Program.StateDirectory);
+            if (Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") != "1") throw new Exception("Isolated test state required.");
+            Directory.CreateDirectory(AgentPal.Program.StateDirectory);
             Application.EnableVisualStyles();
             UiLanguageBindings.Initialize();
             TestLanguage();
@@ -54,7 +54,7 @@ internal static class ProfileSettingsTests
 
     private static void TestProfiles()
     {
-        string root = XianPal.Program.StateDirectory;
+        string root = AgentPal.Program.StateDirectory;
         var preferences = new IntegrationPreferences();
         string global = Path.Combine(root, "global claude.cmd"); File.WriteAllText(global, "@exit /b 0");
         preferences.SetExecutablePath(null, global);
@@ -89,20 +89,20 @@ internal static class ProfileSettingsTests
 
     private static void TestTasks(string assets)
     {
-        Environment.SetEnvironmentVariable("XIANPAL_TEST_ASSETS", Path.GetFullPath(assets));
+        Environment.SetEnvironmentVariable("AGENT_PAL_TEST_ASSETS", Path.GetFullPath(assets));
         using (var service = new ClaudeTaskService())
         {
             foreach (PetCharacter role in PetCharacter.All)
             {
-                var task = service.Add("Keep original 中文🌱 " + role.Id, XianPal.Program.StateDirectory, "daily", TimeSpan.FromHours(9), DayOfWeek.Monday, 60, DateTime.Now, "background", "block", role.Id);
+                var task = service.Add("Keep original 中文🌱 " + role.Id, AgentPal.Program.StateDirectory, "daily", TimeSpan.FromHours(9), DayOfWeek.Monday, 60, DateTime.Now, "background", "block", role.Id);
                 var run = service.BeginRun(task, DateTime.Now);
                 service.CompleteRun(task, run.Id, true, 0, "原文 🌱", DateTime.Now);
                 service.RecordSkipped(task, DateTime.Now, "Still active");
                 string replacement = role.Id == "orbit" ? "spark" : "orbit";
-                string editedDirectory = Path.Combine(XianPal.Program.StateDirectory, "edited-folder"); Directory.CreateDirectory(editedDirectory);
+                string editedDirectory = Path.Combine(AgentPal.Program.StateDirectory, "edited-folder"); Directory.CreateDirectory(editedDirectory);
                 service.Update(task, "Updated task 中文🌱", editedDirectory, "weekly", TimeSpan.FromHours(10), DayOfWeek.Friday, 60, DateTime.Now, "background", "block", replacement);
                 Check(run.CharacterId == role.Id && task.History[0].CharacterId == role.Id && task.CharacterId == replacement, "editing owner preserves historical and skipped run identities for " + role.Id);
-                Check(run.WorkingDirectory == XianPal.Program.StateDirectory && run.Prompt.Contains("Keep original") && ClaudeTaskRunTranscriptForm.BuildTranscript(task, run).Contains("Keep original"), "historical directory and original prompt survive task edits for " + role.Id);
+                Check(run.WorkingDirectory == AgentPal.Program.StateDirectory && run.Prompt.Contains("Keep original") && ClaudeTaskRunTranscriptForm.BuildTranscript(task, run).Contains("Keep original"), "historical directory and original prompt survive task edits for " + role.Id);
             }
             using (var window = new ClaudeTaskForm(service))
             {
@@ -151,7 +151,7 @@ internal static class ProfileSettingsTests
 
     private static void TestReminderWeekday()
     {
-        string path = Path.Combine(XianPal.Program.StateDirectory, "reminders.json");
+        string path = Path.Combine(AgentPal.Program.StateDirectory, "reminders.json");
         File.WriteAllText(path, "{\"Reminders\":[{\"Text\":\"Legacy daily\",\"MinutesAfterMidnight\":600}]}");
         UiLanguage.Set("en");
         using (var service = new ReminderService())

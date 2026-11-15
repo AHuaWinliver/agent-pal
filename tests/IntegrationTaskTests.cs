@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 using System.Web.Script.Serialization;
-using XianPal;
+using AgentPal;
 
 internal static class IntegrationTaskTests
 {
@@ -32,7 +32,7 @@ internal static class IntegrationTaskTests
     {
         if (args.Length > 0 && (args[0] == "--session-id" || args[0] == "-p"))
         {
-            string expected = Environment.GetEnvironmentVariable("FUFU_TEST_EXPECTED_SETTINGS");
+            string expected = Environment.GetEnvironmentVariable("AGENT_PAL_TEST_EXPECTED_SETTINGS");
             int settings = Array.IndexOf(args, "--settings");
             if (!String.IsNullOrEmpty(expected) && (settings < 0 || settings + 1 >= args.Length || args[settings + 1] != expected))
                 return 94;
@@ -46,7 +46,7 @@ internal static class IntegrationTaskTests
                 if (Array.IndexOf(args, "--include-partial-messages") < 0) return 12;
                 Emit(new { type = "system", subtype = "init", session_id = "11111111-1111-4111-8111-111111111111" });
                 Emit(new { type = "stream_event", @event = new { type = "message_start", message = new { id = "m1" } } });
-                string reply = "工作目录=" + Environment.CurrentDirectory + "\n中文回复：你好，世界！✅ 😊 🚀\nMANAGED=" + Environment.GetEnvironmentVariable("FUFU_PET_MANAGED_SESSION") + "\nTASK=" + Environment.GetEnvironmentVariable("FUFU_PET_INTERNAL_TASK_ID");
+                string reply = "工作目录=" + Environment.CurrentDirectory + "\n中文回复：你好，世界！✅ 😊 🚀\nMANAGED=" + Environment.GetEnvironmentVariable("AGENT_PAL_PET_MANAGED_SESSION") + "\nTASK=" + Environment.GetEnvironmentVariable("AGENT_PAL_PET_INTERNAL_TASK_ID");
                 Emit(new { type = "stream_event", @event = new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text = reply } } });
                 Thread.Sleep(1200);
                 Emit(new { type = "assistant", message = new { id = "m1", content = new[] { new { type = "text", text = reply } } } });
@@ -56,8 +56,8 @@ internal static class IntegrationTaskTests
                 // Keep the fixture in its tool phase until the UI monitor has
                 // observed it. A loaded CI desktop must not turn this into a
                 // race between a fixed sleep and a Windows Forms timer tick.
-                string acknowledgment = Environment.GetEnvironmentVariable("XIANPAL_TEST_STREAM_ACK");
-                if (!String.IsNullOrEmpty(acknowledgment) && Environment.GetEnvironmentVariable("FUFU_TEST_MODE") == "1")
+                string acknowledgment = Environment.GetEnvironmentVariable("AGENT_PAL_TEST_STREAM_ACK");
+                if (!String.IsNullOrEmpty(acknowledgment) && Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") == "1")
                 {
                     Stopwatch waiting = Stopwatch.StartNew();
                     while (!File.Exists(acknowledgment) && waiting.ElapsedMilliseconds < 15000) Thread.Sleep(40);
@@ -75,8 +75,8 @@ internal static class IntegrationTaskTests
             }
             Console.WriteLine("工作目录=" + Environment.CurrentDirectory);
             Console.WriteLine("中文回复：你好，世界！✅ 😊 🚀");
-            Console.WriteLine("MANAGED=" + Environment.GetEnvironmentVariable("FUFU_PET_MANAGED_SESSION"));
-            Console.WriteLine("TASK=" + Environment.GetEnvironmentVariable("FUFU_PET_INTERNAL_TASK_ID"));
+            Console.WriteLine("MANAGED=" + Environment.GetEnvironmentVariable("AGENT_PAL_PET_MANAGED_SESSION"));
+            Console.WriteLine("TASK=" + Environment.GetEnvironmentVariable("AGENT_PAL_PET_INTERNAL_TASK_ID"));
             Thread.Sleep(1600);
             Console.WriteLine("结束：文件处理完成。");
             return args.Length > 1 && args[1].Contains("FAIL_TEST") ? 7 : 0;
@@ -87,10 +87,10 @@ internal static class IntegrationTaskTests
             {
                 root = args[1]; Application.EnableVisualStyles(); TestPetLiveFeedback(); return 0;
             }
-            root = Environment.GetEnvironmentVariable("FUFU_STATE_DIR");
+            root = Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR");
             if (String.IsNullOrEmpty(root) || !root.Contains("integration-task-test")) throw new Exception("isolated test state required");
             pet = args[0];
-            Environment.SetEnvironmentVariable("FUFU_NATIVE_TEST_PET", Path.GetFullPath(pet));
+            Environment.SetEnvironmentVariable("AGENT_PAL_NATIVE_TEST_PET", Path.GetFullPath(pet));
             if (args.Length > 1) ReadInstalledBridge(args[1]);
             Directory.CreateDirectory(root);
             Application.EnableVisualStyles();
@@ -109,8 +109,8 @@ internal static class IntegrationTaskTests
 
     private static int MockNativeCli(string[] args)
     {
-        if (Environment.GetEnvironmentVariable("FUFU_TEST_MODE") != "1") return 90;
-        string log = Environment.GetEnvironmentVariable("FUFU_PET_NATIVE_RUN_LOG");
+        if (Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") != "1") return 90;
+        string log = Environment.GetEnvironmentVariable("AGENT_PAL_PET_NATIVE_RUN_LOG");
         if (String.IsNullOrEmpty(log) || !log.Contains("integration-task-test")) return 91;
         Console.OutputEncoding = new UTF8Encoding(false);
         JavaScriptSerializer json = new JavaScriptSerializer();
@@ -140,7 +140,7 @@ internal static class IntegrationTaskTests
 
     private static void NativeHook(string name, object value)
     {
-        string executable = Environment.GetEnvironmentVariable("FUFU_NATIVE_TEST_PET");
+        string executable = Environment.GetEnvironmentVariable("AGENT_PAL_NATIVE_TEST_PET");
         if (String.IsNullOrEmpty(executable)) throw new Exception("native test hook target missing");
         ProcessStartInfo info = new ProcessStartInfo(executable, "--hook " + name) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
         using (Process hook = Process.Start(info))
@@ -155,7 +155,7 @@ internal static class IntegrationTaskTests
     private static void TestNativeRuns()
     {
         Assembly package = Assembly.LoadFrom(pet);
-        Type taskType = package.GetType("XianPal.ScheduledClaudeTask"), form = package.GetType("XianPal.PetForm");
+        Type taskType = package.GetType("AgentPal.ScheduledClaudeTask"), form = package.GetType("AgentPal.PetForm");
         MethodInfo build = form.GetMethod("BuildVisibleTaskStartInfo", BindingFlags.Static | BindingFlags.NonPublic, null, new Type[] { taskType, typeof(string), typeof(string) }, null);
         string logs = Path.Combine(root, "scheduled-task-runs"); Directory.CreateDirectory(logs);
         foreach (string mode in new[] { "interactive-powershell", "interactive-terminal" })
@@ -218,23 +218,23 @@ internal static class IntegrationTaskTests
     {
         Dictionary<string, object> owner = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(log + ".interactive"));
         Dictionary<string, string> previous = new Dictionary<string, string>();
-        foreach (string name in new[] { "FUFU_PET_NATIVE_RUN_LOG", "FUFU_PET_NATIVE_RUN_TOKEN", "FUFU_PET_INTERNAL_TASK_ID", "FUFU_PET_MANAGED_SESSION" }) previous[name] = Environment.GetEnvironmentVariable(name);
+        foreach (string name in new[] { "AGENT_PAL_PET_NATIVE_RUN_LOG", "AGENT_PAL_PET_NATIVE_RUN_TOKEN", "AGENT_PAL_PET_INTERNAL_TASK_ID", "AGENT_PAL_PET_MANAGED_SESSION" }) previous[name] = Environment.GetEnvironmentVariable(name);
         string before = File.ReadAllText(log);
         try
         {
-            Environment.SetEnvironmentVariable("FUFU_PET_NATIVE_RUN_LOG", log);
-            Environment.SetEnvironmentVariable("FUFU_PET_NATIVE_RUN_TOKEN", (string)owner["Token"]);
-            Environment.SetEnvironmentVariable("FUFU_PET_INTERNAL_TASK_ID", (string)owner["TaskId"]);
-            Environment.SetEnvironmentVariable("FUFU_PET_MANAGED_SESSION", "1");
+            Environment.SetEnvironmentVariable("AGENT_PAL_PET_NATIVE_RUN_LOG", log);
+            Environment.SetEnvironmentVariable("AGENT_PAL_PET_NATIVE_RUN_TOKEN", (string)owner["Token"]);
+            Environment.SetEnvironmentVariable("AGENT_PAL_PET_INTERNAL_TASK_ID", (string)owner["TaskId"]);
+            Environment.SetEnvironmentVariable("AGENT_PAL_PET_MANAGED_SESSION", "1");
             NativeHook("MessageDisplay", new { session_id = Guid.NewGuid().ToString("D"), delta = "foreign session must not be collected" });
             Require(File.ReadAllText(log) == before, "native hook rejects another / child Claude session");
-            Environment.SetEnvironmentVariable("FUFU_PET_NATIVE_RUN_TOKEN", Guid.NewGuid().ToString("N"));
+            Environment.SetEnvironmentVariable("AGENT_PAL_PET_NATIVE_RUN_TOKEN", Guid.NewGuid().ToString("N"));
             NativeHook("MessageDisplay", new { session_id = (string)owner["SessionId"], delta = "wrong run token" });
             Require(File.ReadAllText(log) == before, "native hook rejects mismatched run token");
-            Environment.SetEnvironmentVariable("FUFU_PET_NATIVE_RUN_TOKEN", (string)owner["Token"]);
+            Environment.SetEnvironmentVariable("AGENT_PAL_PET_NATIVE_RUN_TOKEN", (string)owner["Token"]);
             string outside = Path.Combine(root, "unrelated-test.log");
             File.WriteAllText(outside, "preserve"); File.WriteAllText(outside + ".interactive", new JavaScriptSerializer().Serialize(owner));
-            Environment.SetEnvironmentVariable("FUFU_PET_NATIVE_RUN_LOG", outside);
+            Environment.SetEnvironmentVariable("AGENT_PAL_PET_NATIVE_RUN_LOG", outside);
             NativeHook("MessageDisplay", new { session_id = (string)owner["SessionId"], delta = "path outside run folder" });
             Require(File.ReadAllText(outside) == "preserve", "native hook cannot write outside owned run directory");
         }
@@ -287,22 +287,22 @@ internal static class IntegrationTaskTests
         string bin = Path.Combine(root, "mock-cli"); Directory.CreateDirectory(bin);
         File.WriteAllText(Path.Combine(bin, "claude.cmd"), "@echo off\r\n\"" + Assembly.GetExecutingAssembly().Location + "\" %*\r\n", Encoding.ASCII);
         string oldPath = Environment.GetEnvironmentVariable("PATH");
-        string oldState = Environment.GetEnvironmentVariable("FUFU_STATE_DIR");
-        string previousAcknowledgment = Environment.GetEnvironmentVariable("XIANPAL_TEST_STREAM_ACK");
+        string oldState = Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR");
+        string previousAcknowledgment = Environment.GetEnvironmentVariable("AGENT_PAL_TEST_STREAM_ACK");
         Environment.SetEnvironmentVariable("PATH", bin + Path.PathSeparator + oldPath);
-        Environment.SetEnvironmentVariable("FUFU_TEST_CLAUDE_COMMAND", Path.Combine(bin, "claude.cmd"));
-        string settingsPath = Path.Combine(root, "角色 Claude O'Brien & %FUFU_TEST_PATH_TOKEN%.json");
+        Environment.SetEnvironmentVariable("AGENT_PAL_TEST_CLAUDE_COMMAND", Path.Combine(bin, "claude.cmd"));
+        string settingsPath = Path.Combine(root, "角色 Claude O'Brien & %AGENT_PAL_TEST_PATH_TOKEN%.json");
         File.WriteAllText(settingsPath, "{\"model\":\"sonnet\"}", new UTF8Encoding(false));
-        Environment.SetEnvironmentVariable("FUFU_TEST_PATH_TOKEN", "should-stay-literal");
-        Environment.SetEnvironmentVariable("FUFU_TEST_EXPECTED_SETTINGS", settingsPath);
+        Environment.SetEnvironmentVariable("AGENT_PAL_TEST_PATH_TOKEN", "should-stay-literal");
+        Environment.SetEnvironmentVariable("AGENT_PAL_TEST_EXPECTED_SETTINGS", settingsPath);
         try
         {
             foreach (string scenario in new[] { "background", "background-parallel", "powershell", "terminal", "interactive-powershell", "interactive-terminal" })
             {
                 string mode = scenario == "background-parallel" ? "background" : scenario;
-                Environment.SetEnvironmentVariable("FUFU_STATE_DIR", Path.Combine(root, "live-" + scenario));
+                Environment.SetEnvironmentVariable("AGENT_PAL_STATE_DIR", Path.Combine(root, "live-" + scenario));
                 string acknowledgment = Path.Combine(Program.StateDirectory, "live-stream-observed");
-                Environment.SetEnvironmentVariable("XIANPAL_TEST_STREAM_ACK", ClaudeTaskService.IsInteractiveMode(mode) ? null : acknowledgment);
+                Environment.SetEnvironmentVariable("AGENT_PAL_TEST_STREAM_ACK", ClaudeTaskService.IsInteractiveMode(mode) ? null : acknowledgment);
                 var preferences = new IntegrationPreferences { ClaudeSettingsPath = Path.Combine(root, "unused-default.json") };
                 preferences.SetSettingsPath("orbit", settingsPath);
                 preferences.Save();
@@ -352,11 +352,11 @@ internal static class IntegrationTaskTests
         finally
         {
             Environment.SetEnvironmentVariable("PATH", oldPath);
-            Environment.SetEnvironmentVariable("FUFU_STATE_DIR", oldState);
-            Environment.SetEnvironmentVariable("XIANPAL_TEST_STREAM_ACK", previousAcknowledgment);
-            Environment.SetEnvironmentVariable("FUFU_TEST_CLAUDE_COMMAND", null);
-            Environment.SetEnvironmentVariable("FUFU_TEST_EXPECTED_SETTINGS", null);
-            Environment.SetEnvironmentVariable("FUFU_TEST_PATH_TOKEN", null);
+            Environment.SetEnvironmentVariable("AGENT_PAL_STATE_DIR", oldState);
+            Environment.SetEnvironmentVariable("AGENT_PAL_TEST_STREAM_ACK", previousAcknowledgment);
+            Environment.SetEnvironmentVariable("AGENT_PAL_TEST_CLAUDE_COMMAND", null);
+            Environment.SetEnvironmentVariable("AGENT_PAL_TEST_EXPECTED_SETTINGS", null);
+            Environment.SetEnvironmentVariable("AGENT_PAL_TEST_PATH_TOKEN", null);
         }
     }
 
@@ -410,10 +410,10 @@ internal static class IntegrationTaskTests
         Require(metadata.Contains("外部中文回复") && metadata.Contains("pet_managed"), "opt-in hook preserves Chinese metadata");
         settings.MonitorExternalSessions = false; settings.Save();
         ProcessStartInfo background = ClaudeCliRunner.BuildStartInfo("claude.cmd", root, null);
-        Require(background.EnvironmentVariables["FUFU_PET_MANAGED_SESSION"] == "1", "background conversations carry ownership marker");
+        Require(background.EnvironmentVariables["AGENT_PAL_PET_MANAGED_SESSION"] == "1", "background conversations carry ownership marker");
         string terminalArguments = PetForm.BuildTerminalStartInfo(root).Arguments;
         string terminalScript = Encoding.Unicode.GetString(Convert.FromBase64String(terminalArguments.Substring(terminalArguments.LastIndexOf(' ') + 1)));
-        Require(terminalScript.Contains("FUFU_PET_MANAGED_SESSION"), "interactive CLI carries ownership marker");
+        Require(terminalScript.Contains("AGENT_PAL_PET_MANAGED_SESSION"), "interactive CLI carries ownership marker");
         string global = Path.Combine(root, "global.json");
         string specific = Path.Combine(root, "专用 O'Brien.json");
         File.WriteAllText(global, "{\"model\":\"sonnet\"}");
@@ -451,8 +451,8 @@ internal static class IntegrationTaskTests
             arguments = "\"" + bridgeScript.Replace('\\', '/') + "\"";
         }
         ProcessStartInfo info = new ProcessStartInfo(executable, arguments) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = !bridge, RedirectStandardError = true };
-        info.EnvironmentVariables["FUFU_PET_MANAGED_SESSION"] = managed ? "1" : "";
-        info.EnvironmentVariables["FUFU_PET_INTERNAL_TASK_ID"] = taskId ?? "";
+        info.EnvironmentVariables["AGENT_PAL_PET_MANAGED_SESSION"] = managed ? "1" : "";
+        info.EnvironmentVariables["AGENT_PAL_PET_INTERNAL_TASK_ID"] = taskId ?? "";
         using (Process process = Process.Start(info))
         {
             string error = "";
@@ -543,8 +543,8 @@ internal static class IntegrationTaskTests
     private static void TestVisibleRuns()
     {
         Assembly package = Assembly.LoadFrom(pet);
-        Type taskType = package.GetType("XianPal.ScheduledClaudeTask");
-        Type formType = package.GetType("XianPal.PetForm");
+        Type taskType = package.GetType("AgentPal.ScheduledClaudeTask");
+        Type formType = package.GetType("AgentPal.PetForm");
         MethodInfo build = formType.GetMethod("BuildVisibleTaskStartInfo", BindingFlags.Static | BindingFlags.NonPublic, null, new Type[] { taskType, typeof(string), typeof(string) }, null);
         string directory = Path.Combine(root, "中文 ' 工作目录"); Directory.CreateDirectory(directory);
         int desktopCount = VirtualDesktopService.GetDesktopIds().Count;
@@ -563,12 +563,12 @@ internal static class IntegrationTaskTests
                 string token = Regex.Match(info.Arguments, @"OrbitTask-[a-f0-9]{32}").Value;
                 bool done = false; int code = -99; string output = ""; int completions = 0; bool progress = false, liveBeforeCompleted = false, toolState = false;
                 string acknowledgment = path + ".observed";
-                string previousAcknowledgment = Environment.GetEnvironmentVariable("XIANPAL_TEST_STREAM_ACK");
+                string previousAcknowledgment = Environment.GetEnvironmentVariable("AGENT_PAL_TEST_STREAM_ACK");
                 using (VisibleTaskMonitor monitor = new VisibleTaskMonitor(path, delegate(string value) { progress = value.Contains("中文回复"); if (progress && !File.Exists(path + ".completed")) liveBeforeCompleted = true; }, delegate(int result, string value) { code = result; output = value; completions++; done = true; }, delegate(string status, string session, string reaction) { if (reaction == "PreToolUse" && session.Length > 0) { toolState = true; File.WriteAllText(acknowledgment, "observed"); } }))
                 {
                     try
                     {
-                        Environment.SetEnvironmentVariable("XIANPAL_TEST_STREAM_ACK", variant == 0 ? acknowledgment : null);
+                        Environment.SetEnvironmentVariable("AGENT_PAL_TEST_STREAM_ACK", variant == 0 ? acknowledgment : null);
                         monitor.Start(info);
                         Require(PumpUntil(delegate { return done; }, 25000), mode + " completion handshake");
                         Require(code == (variant == 1 ? 7 : 0) && completions == 1, mode + " actual exit code, exactly one completion");
@@ -587,7 +587,7 @@ internal static class IntegrationTaskTests
                     }
                     finally
                     {
-                        Environment.SetEnvironmentVariable("XIANPAL_TEST_STREAM_ACK", previousAcknowledgment);
+                        Environment.SetEnvironmentVariable("AGENT_PAL_TEST_STREAM_ACK", previousAcknowledgment);
                         if (done && mode == "terminal")
                         {
                             IntPtr ownWindow = VirtualDesktopService.FindTaskTerminalWindow(token);

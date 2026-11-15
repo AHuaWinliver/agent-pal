@@ -38,16 +38,16 @@ Containers validate userspace libraries and share the host kernel. They do not
 validate a distribution's original kernel, every desktop environment or the target
 TurboVNC session.
 
-[Complete compatibility matrix results](https://github.com/AHuaWinliver/xianpal-ai-companion/actions/runs/42461453474)
+[Complete compatibility matrix results](https://github.com/AHuaWinliver/agent-pal/actions/runs/42461453474)
 
 ![Native Linux workshop using isolated demonstration data](images/linux-workshop.png)
 
 ## Build
 
 ```sh
-python3 src/DesktopTasks/XianPal.Linux/fetch-fonts.py build/linux-resources/fonts
-dotnet publish src/DesktopTasks/XianPal.Linux -r linux-arm64 --self-contained true -c Release -o build/linux-app
-build/linux-app/xianpal --self-test
+python3 src/DesktopTasks/AgentPal.Linux/fetch-fonts.py build/linux-resources/fonts
+dotnet publish src/DesktopTasks/AgentPal.Linux -r linux-arm64 --self-contained true -c Release -o build/linux-app
+build/linux-app/agent-pal --self-test
 ```
 
 Character assets are generated with the existing Windows artwork tools. CI transfers
@@ -59,8 +59,8 @@ machine downloads fonts. The installed application makes no font download reques
 For the legacy x64 candidate:
 
 ```sh
-dotnet publish src/DesktopTasks/XianPal.Linux -p:LinuxCompat=true -r linux-x64 --self-contained true -c Release -o build/linux-compat-x64
-python3 src/DesktopTasks/XianPal.Linux/bundle-runtime.py build/linux-compat-x64
+dotnet publish src/DesktopTasks/AgentPal.Linux -p:LinuxCompat=true -r linux-x64 --self-contained true -c Release -o build/linux-compat-x64
+python3 src/DesktopTasks/AgentPal.Linux/bundle-runtime.py build/linux-compat-x64
 build/linux-compat-x64/launch.sh --self-test
 ```
 
@@ -84,7 +84,7 @@ than running a network installer on the intranet machine.
 Read-only inventory:
 
 ```sh
-sh src/DesktopTasks/XianPal.Linux/diagnose-linux.sh
+sh src/DesktopTasks/AgentPal.Linux/diagnose-linux.sh
 ```
 
 Use the current graphical session and its `DISPLAY`. The current build uses X11;
@@ -92,12 +92,12 @@ Wayland sessions need XWayland. For a VNC session with unusable GLX, select CPU
 rasterization before launch:
 
 ```sh
-XIANPAL_RENDERER=software ./launch.sh
+AGENT_PAL_RENDERER=software ./launch.sh
 ```
 
 An unset renderer uses GLX with software fallback. Chinese and emoji fonts are
 bundled, so replacing system fonts is unnecessary. State uses the user's XDG state
-directory; external character packs use the XDG data directory's `xianpal/Characters/`.
+directory; external character packs use the XDG data directory's `agent-pal/Characters/`.
 
 ## Installation and desktop integration
 
@@ -106,7 +106,7 @@ your graphical session to select a destination, switch between English and Chine
 and preview the original character animations. For unattended installation, use:
 
 ```sh
-sh install.sh --silent --install-dir "$HOME/.local/opt/xianpal"
+sh install.sh --silent --install-dir "$HOME/.local/opt/agent-pal"
 ```
 
 Installation checks the payload and verifies each copied file. Updates retain the
@@ -117,7 +117,7 @@ independent Claude jobs. It creates a current-user desktop menu launcher.
 
 **Default settings** includes user autostart, per-companion CLI executable and JSON
 settings, and docked opacity. A tray menu can show or hide the companion. Tray display
-depends on the desktop's StatusNotifierItem / AppIndicator support; launching XianPal
+depends on the desktop's StatusNotifierItem / AppIndicator support; launching agent-pal
 again also restores a hidden window. [Avalonia tray integration](https://docs.avaloniaui.net/controls/navigation/trayicon/)
 
 Native terminal tasks keep Claude's interactive interface and terminal input. Each

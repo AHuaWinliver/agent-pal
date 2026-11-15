@@ -13,13 +13,13 @@ internal static class HallSceneTests
     {
         try
         {
-            Require(Environment.GetEnvironmentVariable("FUFU_TEST_MODE")=="1"&&AppDomain.CurrentDomain.BaseDirectory.Contains("xianpal-hall-install-test-"),"isolated installed runtime required");
+            Require(Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE")=="1"&&AppDomain.CurrentDomain.BaseDirectory.Contains("agent-pal-hall-install-test-"),"isolated installed runtime required");
             Application.EnableVisualStyles();
-            string app=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"OrbitPet.exe");Assembly assembly=Assembly.LoadFrom(app);
-            using(Stream stream=assembly.GetManifestResourceStream("XianPal.SectHall.Background.png"))
+            string app=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"agent-pal.exe");Assembly assembly=Assembly.LoadFrom(app);
+            using(Stream stream=assembly.GetManifestResourceStream("AgentPal.SectHall.Background.png"))
             {Require(stream!=null,"production executable contains embedded hall art");using(Image image=Image.FromStream(stream))Require(image.Width>=320&&image.Height>=200,"production embedded PNG decodes");}
-            Type hall=assembly.GetType("XianPal.SectHallControl",true);
-            object instance=hall.GetConstructors(BindingFlags.Instance|BindingFlags.NonPublic)[0].Invoke(new object[]{NullGetter(assembly.GetType("XianPal.CompanionSect",true)),NullGetter(assembly.GetType("XianPal.SectRun",true)),new Action<string>(delegate{})});
+            Type hall=assembly.GetType("AgentPal.SectHallControl",true);
+            object instance=hall.GetConstructors(BindingFlags.Instance|BindingFlags.NonPublic)[0].Invoke(new object[]{NullGetter(assembly.GetType("AgentPal.CompanionSect",true)),NullGetter(assembly.GetType("AgentPal.SectRun",true)),new Action<string>(delegate{})});
             using(Control control=(Control)instance)
             {
                 Require((bool)hall.GetProperty("HasBackgroundImage",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(control,null),"installed hall loads actual background");

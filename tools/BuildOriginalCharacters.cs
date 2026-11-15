@@ -10,7 +10,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Web.Script.Serialization;
-using XianPal;
+using AgentPal;
 
 internal static class BuildOriginalCharacters
 {
@@ -35,7 +35,7 @@ internal static class BuildOriginalCharacters
             using(Graphics grid=Graphics.FromImage(gallery))
             {
                 grid.Clear(Color.FromArgb(248,245,236)); Quality(grid);
-                var html=new StringBuilder("<!doctype html><meta charset='utf-8'><title>仙伴 · AI桌面伴侣 动作预览</title><style>body{font:16px 'Microsoft YaHei UI',sans-serif;background:#f8f5ec;color:#303c41;margin:24px}main{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}section{border:1px solid #dfd9c9;border-radius:20px;padding:14px;text-align:center;background:#fffdf8}img{width:288px;height:312px;object-fit:contain}button{padding:9px 12px;margin:4px;border:1px solid #d2c9b2;border-radius:8px;background:white}h1{font-size:24px}.hint{font-size:13px;color:#6c756f}</style><h1>仙伴 · 国风 AI桌面伴侣</h1><p>透明原画分层动画 · 对侧摆臂与脚步 · 24相位 · 本地离线预览</p><nav>");
+                var html=new StringBuilder("<!doctype html><meta charset='utf-8'><title>agent-pal 动作预览</title><style>body{font:16px 'Microsoft YaHei UI',sans-serif;background:#f8f5ec;color:#303c41;margin:24px}main{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}section{border:1px solid #dfd9c9;border-radius:20px;padding:14px;text-align:center;background:#fffdf8}img{width:288px;height:312px;object-fit:contain}button{padding:9px 12px;margin:4px;border:1px solid #d2c9b2;border-radius:8px;background:white}h1{font-size:24px}.hint{font-size:13px;color:#6c756f}</style><h1>agent-pal · 国风 AI桌面伴侣</h1><p>透明原画分层动画 · 对侧摆臂与脚步 · 24相位 · 本地离线预览</p><nav>");
                 foreach(string state in States) html.Append("<button onclick=\"state='"+state+"';frame=0\">"+state+"</button>");
                 html.Append("<button onclick=\"paused=!paused\">暂停 / 播放</button><button onclick=\"step()\">下一帧</button></nav><p id='counter'></p><main>");
                 for(int id=0;id<PetCharacter.All.Length;id++)
