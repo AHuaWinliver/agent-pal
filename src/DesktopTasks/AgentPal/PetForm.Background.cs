@@ -24,7 +24,7 @@ namespace AgentPal
         {
             ClaudeTaskRunRecord run = claudeTaskService.BeginRun(task, DateTime.Now);
             if (run == null) return;
-            run.BackgroundJobName = "OrbitBg-" + run.Id;
+            run.BackgroundJobName = "agent-pal-bg-" + run.Id;
             run.BackgroundState = "dispatching";
             claudeTaskService.PersistBackgroundRun(task, run);
             string path = BackgroundLogPath(run);
@@ -89,7 +89,7 @@ namespace AgentPal
             if (task == null || run == null) throw new ArgumentNullException("task/run");
             if (!Directory.Exists(task.WorkingDirectory)) throw new DirectoryNotFoundException("任务目录不存在。");
             Guid runId;
-            if (!Guid.TryParse(run.Id, out runId) || run.BackgroundJobName != "OrbitBg-" + run.Id) throw new ArgumentException("后台会话归属标识无效。");
+            if (!Guid.TryParse(run.Id, out runId) || (run.BackgroundJobName != "agent-pal-bg-" + run.Id && run.BackgroundJobName != "OrbitBg-" + run.Id)) throw new ArgumentException("后台会话归属标识无效。");
             string directory = Path.GetFullPath(task.WorkingDirectory), path = Path.GetFullPath(logPath);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string cli = command.Replace("'", "''"), log = path.Replace("'", "''");
@@ -129,7 +129,7 @@ namespace AgentPal
                 "$prompt=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + Convert.ToBase64String(Encoding.UTF8.GetBytes(prompt)) + "')); " +
                 // No pipe / redirection here: an untrusted workspace can show
                 // its native trust dialog. Only this own new console exits.
-                "& '" + cli + "' --bg --name '" + run.BackgroundJobName + "' --settings $agent-palSettings $prompt; $code=$LASTEXITCODE; if($null -eq $code){$code=1}; " +
+                "& '" + cli + "' --bg --name '" + run.BackgroundJobName + "' --settings $agentPalSettings $prompt; $code=$LASTEXITCODE; if($null -eq $code){$code=1}; " +
                 "[IO.File]::AppendAllText('" + log + "',('后台会话创建命令退出码：'+$code+'；这不是任务完成信号。')+[Environment]::NewLine,$utf8) " +
                 "} catch { [IO.File]::AppendAllText('" + log + "',('[创建失败] '+[string]$_)+[Environment]::NewLine,$utf8); Write-Host $_; $code=1 } " +
                 "finally { [IO.File]::WriteAllText('" + log + ".dispatch-exit.tmp',[string][int]$code,$utf8); [IO.File]::Move('" + log + ".dispatch-exit.tmp','" + log + ".dispatch-exit') }; " +
@@ -161,7 +161,7 @@ namespace AgentPal
             string command = ClaudeCliRunner.RequireClaudeCommand(run.CharacterId);
             string settings = ClaudeSettingsFile.CurrentPath(run.CharacterId);
             string script = "$ErrorActionPreference='Stop'; $utf8=New-Object Text.UTF8Encoding($false); $OutputEncoding=$utf8; [Console]::InputEncoding=$utf8; [Console]::OutputEncoding=$utf8; Set-Location -LiteralPath '" + directory.Replace("'", "''") + "'; " +
-                ClaudeSettingsFile.PowerShellSetup(settings, command) + "try { & '" + command.Replace("'", "''") + "' " + (settings.Length == 0 ? "" : "--settings $agent-palSettings ") + "attach '" + run.BackgroundJobId + "' } finally { Remove-Item Env:AGENT_PAL_PET_SETTINGS_FILE -ErrorAction SilentlyContinue }";
+                ClaudeSettingsFile.PowerShellSetup(settings, command) + "try { & '" + command.Replace("'", "''") + "' " + (settings.Length == 0 ? "" : "--settings $agentPalSettings ") + "attach '" + run.BackgroundJobId + "' } finally { Remove-Item Env:AGENT_PAL_PET_SETTINGS_FILE -ErrorAction SilentlyContinue }";
             return new ProcessStartInfo("powershell.exe", "-NoLogo -NoProfile -NoExit -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script)))
             { WorkingDirectory = directory, UseShellExecute = true, WindowStyle = ProcessWindowStyle.Normal };
         }

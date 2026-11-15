@@ -72,7 +72,7 @@ internal sealed class DesktopServices : IDisposable
             {
                 if (task.RunMode == "claude-background")
                 {
-                    record.BackgroundJobName = "agent-palBg-" + record.Id;
+                    record.BackgroundJobName = "agent-pal-bg-" + record.Id;
                     record.BackgroundState = "dispatching";
                 }
                 var info = LinuxTerminalJob.Prepare(task, record, task.CharacterId);

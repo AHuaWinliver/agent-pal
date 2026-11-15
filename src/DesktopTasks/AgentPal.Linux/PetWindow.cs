@@ -408,9 +408,10 @@ internal sealed partial class PetWindow : Window
         var characters = new MenuItem { Header = "切换形象" };
         LinuxLanguageBindings.Caption(characters);
         foreach (PetCharacter profile in PetCharacter.Available)
-            characters.Items.Add(Item(profile.Name, () => { LoadCharacter(profile); Save(); }));
+            characters.Items.Add(Item(profile.IsExternal ? UiLanguage.Format("{0}（外置）", profile.Name) : profile.Name,
+                () => { LoadCharacter(profile); Save(); }));
         characters.Items.Add(Item("打开角色资源目录", () => DesktopUi.OpenFolder(catalog.Root)));
-        characters.Items.Add(Item("刷新外置角色", () => Rescan()));
+        characters.Items.Add(Item("刷新角色资源", () => Rescan()));
         characters.Items.Add(Item("查看校验结果", () => DesktopUi.Notice(this, "角色资源校验", characterScan != null || pendingCharacterScan != null
             ? UiLanguage.Text("资源校验正在后台运行，请稍候。") : characterScanErrors.Length == 0
             ? UiLanguage.Text("未发现资源校验错误。") : string.Join("\n", characterScanErrors))));

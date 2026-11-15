@@ -34,7 +34,7 @@ class ArchiveTests(unittest.TestCase):
                      "fonts/CJK-LICENSE.txt", "fonts/EMOJI-LICENSE.txt"):
             self.write(name, b"fixture")
         self.write("agent-pal", b"\x7fELF\x02\x01" + b"\0" * 12 + (62).to_bytes(2, "little"))
-        self.write("agent-pal.deps.json", json.dumps({"libraries": {"agent-pal/0.6.12": {}}}).encode())
+        self.write("agent-pal.deps.json", json.dumps({"libraries": {"agent-pal/1.0.0": {}}}).encode())
         self.write("agent-pal.runtimeconfig.json", b'{"runtimeOptions":{"tfm":"net10.0"}}')
         header = b"\x89PNG\r\n\x1a\n" + b"\0" * 8 + (384).to_bytes(4, "big") + (416).to_bytes(4, "big") + b"\x08\x06"
         for companion in ("orbit", "spark", "moss", "pippin"):
