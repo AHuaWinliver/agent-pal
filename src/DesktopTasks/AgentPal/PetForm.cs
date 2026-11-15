@@ -1059,7 +1059,8 @@ namespace AgentPal
             foreach (PetCharacter character in PetCharacter.Available)
             {
                 PetCharacter selected = character;
-                ToolStripMenuItem item = new ToolStripMenuItem(character.Name + (character.IsExternal ? "（外置）" : ""));
+                string caption = character.IsExternal ? UiLanguage.Format("{0}（外置）", character.Name) : UiLanguage.Text(character.Name);
+                ToolStripMenuItem item = new ToolStripMenuItem(caption);
                 item.Tag = character.Id;
                 item.Checked = String.Equals(character.Id, currentCharacterId, StringComparison.OrdinalIgnoreCase);
                 item.Click += delegate { SetCharacter(selected.Id, true); };
@@ -1067,8 +1068,12 @@ namespace AgentPal
                 menu.DropDownItems.Add(item);
             }
             menu.DropDownItems.Add(new ToolStripSeparator());
-            var open = new ToolStripMenuItem("打开角色资源目录"); open.Click += delegate { OpenCharacterPackDirectory(); }; menu.DropDownItems.Add(open);
-            var refresh = new ToolStripMenuItem("刷新外置角色 / 查看校验结果"); refresh.Click += delegate { RequestCharacterPackRefresh(true); }; menu.DropDownItems.Add(refresh);
+            var open = new ToolStripMenuItem(UiLanguage.Text("打开角色资源目录")) { Name = "openCharacterPackFolder" };
+            open.Click += delegate { OpenCharacterPackDirectory(); };
+            menu.DropDownItems.Add(open);
+            var refresh = new ToolStripMenuItem(UiLanguage.Text("刷新角色资源")) { Name = "reloadCharacterPacks" };
+            refresh.Click += delegate { RequestCharacterPackRefresh(true); };
+            menu.DropDownItems.Add(refresh);
         }
 
         private void ShowRandomQuote()
@@ -1552,7 +1557,7 @@ namespace AgentPal
             string invoke = "& '" + command.Replace("'", "''") + "'";
             string script = "$env:AGENT_PAL_PET_MANAGED_SESSION='1'; $utf8=New-Object Text.UTF8Encoding($false); $OutputEncoding=$utf8; [Console]::InputEncoding=$utf8; [Console]::OutputEncoding=$utf8; Set-Location -LiteralPath '" + literalDirectory + "'; " +
                 ClaudeSettingsFile.PowerShellSetup(settingsPath, command) +
-                (settingsPath.Length == 0 ? invoke : "try { " + invoke + " --settings $agent-palSettings } finally { Remove-Item Env:AGENT_PAL_PET_SETTINGS_FILE -ErrorAction SilentlyContinue }");
+                (settingsPath.Length == 0 ? invoke : "try { " + invoke + " --settings $agentPalSettings } finally { Remove-Item Env:AGENT_PAL_PET_SETTINGS_FILE -ErrorAction SilentlyContinue }");
             return new ProcessStartInfo("powershell.exe", "-NoLogo -NoExit -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script)))
             {
                 WorkingDirectory = directory,
@@ -2366,7 +2371,7 @@ namespace AgentPal
             if (task == null) throw new ArgumentNullException("task");
             if (!Directory.Exists(task.WorkingDirectory)) throw new DirectoryNotFoundException("任务目录不存在：" + task.WorkingDirectory);
             string settingsPath = ClaudeSettingsFile.CurrentPath(characterId);
-            string settingsArguments = settingsPath.Length == 0 ? "" : " --settings $agent-palSettings";
+            string settingsArguments = settingsPath.Length == 0 ? "" : " --settings $agentPalSettings";
             string directory = Path.GetFullPath(task.WorkingDirectory);
             bool interactive = ClaudeTaskService.IsInteractiveMode(task.RunMode);
             bool terminal = ClaudeTaskService.NormalizeRunMode(task.RunMode) == "terminal" || ClaudeTaskService.NormalizeRunMode(task.RunMode) == "interactive-terminal";

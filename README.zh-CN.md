@@ -80,7 +80,7 @@
 
 ![四位道友各自的灵器和双向飞行姿态](docs/images/artifact-travel.png)
 
-设置每日提醒或倒计时。每日提醒可选角色专属演出或提示框，倒计时以提示框报时。下图是青衡的御剑演绎，可按 **Esc** 退出。[全屏演绎说明](docs/REMINDER-PERFORMANCES.zh-CN.md)
+设置每日或每周提醒，也可开启倒计时。定时提醒可选角色专属演出或提示框，倒计时以提示框报时。下图是青衡的御剑演绎，可按 **Esc** 退出。[全屏演绎说明](docs/REMINDER-PERFORMANCES.zh-CN.md)
 
 <img src="docs/images/sword-flight.gif" alt="青衡召剑、御剑飞行并回落，沿途留下半透明剑光" width="640">
 
@@ -89,7 +89,27 @@
 
 <img src="docs/images/characters.png" alt="青衡、绯笺、苍芷与墨黑灵龟小墨的角色素材" width="100%">
 
-右键选择 **切换形象 → 打开角色资源目录**，复制完整的角色包。agent-pal会校验资源并自动加载，适合在安装后添加或更新角色。
+每个自定义宠物是一个独立的资源文件夹，包含动作、人设、台词和演出风格，可在程序运行中导入。
+
+1. 右键宠物，选择 **切换形象 → 打开角色资源目录**。Windows 新安装默认使用 `%LOCALAPPDATA%\agent-pal\Characters`。菜单会打开实际使用的目录，也适用于从旧版升级的用户。
+2. 将完整角色文件夹（例如 `moon-keeper`）复制进 `Characters`。`character.json` 应直接位于该文件夹中，与动作文件夹同级。
+3. 选择 **切换形象 → 刷新角色资源**。结果窗口会列出已导入的角色和有问题的包。重新打开「切换形象」，选择带「外置」标记的新角色。
+
+![实测菜单：已导入 Moon Keeper，菜单含打开角色资源目录及刷新角色资源](docs/images/character-pack-menu-zh-CN.png)
+
+```text
+Characters/
+└── moon-keeper/
+    ├── character.json
+    ├── idle/
+    ├── running-left/
+    ├── running-right/
+    └── … 其余动作文件夹
+```
+
+完整的动作目录和校验清单见[资源包教程](docs/CHARACTER-PACKS.zh-CN.md)。更新已有角色时沿用相同 ID，并替换为完整的新包。校验失败会保留当前已加载的形象，并在刷新结果里显示原因。
+
+### 制作角色包
 
 1. 复制[人物定制规格单](docs/templates/CHARACTER-SPEC.zh-CN.md)和[角色配置模板](docs/templates/character-profile.json)，定义造型、人设、台词、素材来源和提醒风格。
 2. 绘制透明动作帧，检查双向步态、关节连接、表情和画面边缘。双足动作采用对侧手脚，四足动作采用对角交替。外置角色使用自己的动作帧与内置演绎时间线。

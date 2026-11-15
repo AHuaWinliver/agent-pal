@@ -77,7 +77,7 @@ Each companion has its own animations and expressions. Steps follow the cursor's
 
 ![The four companions riding their artifacts in both directions](docs/images/artifact-travel.png)
 
-Set a daily reminder or countdown. Daily reminders can play a character-specific performance or show a popup. Countdowns use a popup. Below is Qingheng's sword flight, which you can dismiss with **Esc**. [Performance guide](docs/REMINDER-PERFORMANCES.md)
+Set a daily or weekly reminder, or start a countdown. Scheduled reminders can play a character-specific performance or show a popup. Countdowns use a popup. Below is Qingheng's sword flight, which you can dismiss with **Esc**. [Performance guide](docs/REMINDER-PERFORMANCES.md)
 
 <img src="docs/images/sword-flight.gif" alt="Qingheng summons and rides a flying sword with a translucent wake" width="640">
 
@@ -86,7 +86,27 @@ Set a daily reminder or countdown. Daily reminders can play a character-specific
 
 <img src="docs/images/characters.png" alt="Character art for Qingheng, Feijian, Cangzhi and Xiaomo the charcoal turtle" width="100%">
 
-Right-click the companion, open the character menu and select **Open character resource folder (打开角色资源目录)**. Copy a complete character pack into the folder. agent-pal validates and loads character packs while it runs.
+Import a custom pet as a self-contained folder. The app loads its animation, name, personality and reminder style while it runs.
+
+1. Right-click the pet and choose **Companions → Open character pack folder**. On a fresh Windows install, this opens `%LOCALAPPDATA%\agent-pal\Characters`. The menu always opens the active folder, including a folder retained from an earlier version.
+2. Copy the whole exported folder, for example `moon-keeper`, into `Characters`. Place `character.json` directly under `moon-keeper`, alongside the animation folders.
+3. Choose **Companions → Refresh character packs**. The result lists the imported pet by name and reports which packs need attention. Reopen **Companions** and select **Moon Keeper (custom)**.
+
+![The Companions menu showing the imported Moon Keeper and the Open character pack folder and Refresh character packs actions](docs/images/character-pack-menu-en.png)
+
+```text
+Characters/
+└── moon-keeper/
+    ├── character.json
+    ├── idle/
+    ├── running-left/
+    ├── running-right/
+    └── … other animation folders
+```
+
+Use the [pack guide](docs/CHARACTER-PACKS.md) for the full folder layout and the checksum manifest. To update a pet in place, keep its ID and replace the pack with a complete new export. An invalid update leaves the currently loaded frames visible and reports the validation error.
+
+### Author a pack
 
 1. Use the [character specification](docs/templates/CHARACTER-SPEC.md) and [profile template](docs/templates/character-profile.json) to define the look, personality, quotes, art sources and reminder style.
 2. Draw transparent frames and check both walking directions, joint connections, expressions and clipping. Use opposite arm and leg motion for bipeds and diagonal alternation for quadrupeds. External characters use their own frames with built-in performance timelines.

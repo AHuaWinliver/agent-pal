@@ -191,13 +191,27 @@ namespace AgentPal
             if (report) ShowCharacterPackReport();
         }
 
+        private string BuildCharacterPackReport()
+        {
+            var names = new List<string>();
+            foreach (PetCharacter character in PetCharacter.Available)
+                if (character.IsExternal) names.Add(character.Name + " (" + character.Id + ")");
+            string message = UiLanguage.Text("角色资源目录：") + Environment.NewLine + CharacterPackDirectory;
+            if (names.Count == 0 && characterPackErrors.Length == 0)
+                message += Environment.NewLine + Environment.NewLine + UiLanguage.Text("请将包含 character.json 的完整角色文件夹复制到此目录，然后刷新角色资源。");
+            if (names.Count > 0)
+                message += Environment.NewLine + Environment.NewLine + UiLanguage.Text("可用外置角色：") + Environment.NewLine +
+                    String.Join(Environment.NewLine, names) + Environment.NewLine + UiLanguage.Text("在“切换形象”中选择角色。");
+            if (characterPackErrors.Length > 0)
+                message += Environment.NewLine + Environment.NewLine + UiLanguage.Text("以下资源未能应用：") + Environment.NewLine +
+                    String.Join(Environment.NewLine, characterPackErrors);
+            return message;
+        }
+
         private void ShowCharacterPackReport()
         {
-            int count = PetCharacter.Available.Length - PetCharacter.All.Length;
-            string message = "已发现 " + count + " 个外置角色。\n目录：" + CharacterPackDirectory;
-            if (characterPackErrors.Length == 0) message += "\n校验通过。请在“切换形象”中选择新角色。";
-            else message += "\n\n以下资源未能应用（当前已加载形象会保留）：\n" + String.Join("\n", characterPackErrors);
-            MessageBox.Show(message, "外置角色资源", MessageBoxButtons.OK, characterPackErrors.Length == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            MessageBox.Show(BuildCharacterPackReport(), UiLanguage.Text("外置角色资源"), MessageBoxButtons.OK,
+                characterPackErrors.Length == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
         private void OpenCharacterPackDirectory()

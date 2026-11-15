@@ -62,11 +62,11 @@ namespace AgentPal
             if (String.IsNullOrEmpty(path)) return "";
             // Windows PowerShell routes batch shims through cmd.exe. Expand
             // their path once inside quotes so & and % stay filename data.
-            return "$agent-palSettings='" + path.Replace("'", "''") + "'; " +
-                "$agent-palCli=Get-Command -Name '" + command.Replace("'", "''") + "' -ErrorAction Stop; " +
-                "if($agent-palCli.CommandType -eq 'Alias'){$agent-palCli=$agent-palCli.ResolvedCommand}; " +
-                "if($agent-palCli.CommandType -eq 'Application' -and $agent-palCli.Extension -in @('.cmd','.bat')){ " +
-                "$env:AGENT_PAL_PET_SETTINGS_FILE=$agent-palSettings; $agent-palSettings='\"%AGENT_PAL_PET_SETTINGS_FILE%\"'}; ";
+            return "$agentPalSettings='" + path.Replace("'", "''") + "'; " +
+                "$agentPalCli=Get-Command -Name '" + command.Replace("'", "''") + "' -ErrorAction Stop; " +
+                "if($agentPalCli.CommandType -eq 'Alias'){$agentPalCli=$agentPalCli.ResolvedCommand}; " +
+                "if($agentPalCli.CommandType -eq 'Application' -and $agentPalCli.Extension -in @('.cmd','.bat')){ " +
+                "$env:AGENT_PAL_PET_SETTINGS_FILE=$agentPalSettings; $agentPalSettings='\"%AGENT_PAL_PET_SETTINGS_FILE%\"'}; ";
         }
     }
 }

@@ -26,10 +26,10 @@ internal static class CharacterPackTests
     private static CharacterPackManifest Manifest(string folder) { return Json.Deserialize<CharacterPackManifest>(File.ReadAllText(Path.Combine(folder, "character.json"))); }
     private static void SaveManifest(string folder, CharacterPackManifest manifest) { File.WriteAllText(Path.Combine(folder, "character.json"), Json.Serialize(manifest), new UTF8Encoding(false)); }
 
-    private static string WritePack(string parent, string id, string version, Color color)
+    private static string WritePack(string parent, string id, string version, Color color, string displayName = null)
     {
         string folder = Path.Combine(parent, id); Directory.CreateDirectory(folder);
-        var m = new CharacterPackManifest { schemaVersion = 1, id = id, version = version, name = "测试伙伴 " + version, persona = "原创的测试伙伴，" + version,
+        var m = new CharacterPackManifest { schemaVersion = 1, id = id, version = version, name = displayName ?? "测试伙伴 " + version, persona = "原创的测试伙伴，" + version,
             quotes = new[] { "一起开始吧。", "先做一小步。", "歇歇眼睛吧。", "慢慢理清思路。", "我们稳稳地来。" }, reminderStyle = "beam", canvasWidth = 384, canvasHeight = 416, mouthX = .5f, mouthY = .4f,
             files = new Dictionary<string, string>() };
         foreach (string state in CharacterPackCatalog.States)
@@ -158,6 +158,71 @@ internal static class CharacterPackTests
         }
     }
 
+    private static void TestManualImport(string stateRoot)
+    {
+        string manualState = Path.Combine(stateRoot, "manual-import");
+        string packs = Path.Combine(manualState, "characters");
+        string staged = Path.Combine(manualState, "staged");
+        var previousLanguage = UiLanguage.Current;
+        string previousState = Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR");
+        Environment.SetEnvironmentVariable("AGENT_PAL_STATE_DIR", manualState);
+        UiLanguage.Set("en");
+        try
+        {
+            using (var pet = new PetForm())
+            using (var menu = (ToolStripMenuItem)Call(pet, "BuildCharacterMenu", false))
+            {
+                pet.Show();
+                ((FileSystemWatcher)Field(pet, "characterPackWatcher")).EnableRaisingEvents = false;
+                string folder = WritePack(staged, "moon-keeper", "0.1.0", Color.MediumPurple, "Moon Keeper");
+                Directory.Move(folder, Path.Combine(packs, "moon-keeper"));
+                Require(!PetCharacter.Find("moon-keeper").IsExternal, "copied folder is pending with the automatic watcher disabled");
+                var refresh = (ToolStripMenuItem)menu.DropDownItems.Find("reloadCharacterPacks", false)[0];
+                Require(menu.DropDownItems.Find("openCharacterPackFolder", false).Length == 1 &&
+                        refresh.Text == "Refresh character packs", "character menu provides the folder and explicit refresh actions");
+                refresh.PerformClick();
+                Require((bool)Field(pet, "characterManualRefresh"), "Refresh character packs queues a scan with a user-facing result");
+                // Skip opening the modal dialog in this headless fixture. Verify
+                // the report contents after running the actual menu action.
+                pet.GetType().GetField("characterManualRefresh", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(pet, false);
+                Require(Until(delegate { return PetCharacter.Find("moon-keeper").IsExternal; }, 20000),
+                        "manual refresh imports a copied folder without restart or a filesystem event");
+                Require(((string)Call(pet, "BuildCharacterPackReport")).Contains("Moon Keeper (moon-keeper)"),
+                        "refresh results list the imported companion by name and ID");
+                Call(pet, "PopulateCharacterMenu", menu, false);
+                foreach (ToolStripItem item in menu.DropDownItems)
+                {
+                    if (!Object.Equals(item.Tag, "moon-keeper")) continue;
+                    Require(item.Text == "Moon Keeper (custom)", "new custom pet is labeled in the character menu");
+                    item.PerformClick();
+                    break;
+                }
+                Require((string)Field(pet, "currentCharacterId") == "moon-keeper" && CurrentPixel(pet, Color.MediumPurple),
+                        "selecting the imported menu item switches to its animation frames");
+                // Isolated screenshot for the import guide, without user paths.
+                foreach (string language in new[] { "en", "zh-CN" })
+                {
+                    UiLanguage.Set(language);
+                    Call(pet, "PopulateCharacterMenu", menu, false);
+                    menu.DropDown.Show(new Point(SystemInformation.VirtualScreen.Right + 120, 0));
+                    Application.DoEvents();
+                    using (var bitmap = new Bitmap(menu.DropDown.Width, menu.DropDown.Height))
+                    {
+                        menu.DropDown.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+                        bitmap.Save(Path.Combine(stateRoot, "character-pack-menu-" + language + ".png"), ImageFormat.Png);
+                    }
+                    menu.DropDown.Close();
+                }
+                pet.Close();
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AGENT_PAL_STATE_DIR", previousState);
+            UiLanguage.Set(previousLanguage);
+        }
+    }
+
     [STAThread]
     private static int Main(string[] args)
     {
@@ -167,7 +232,7 @@ internal static class CharacterPackTests
             string root = Path.GetFullPath(args[0]), state = Path.Combine(root, "state"); Directory.CreateDirectory(state);
             Environment.SetEnvironmentVariable("AGENT_PAL_TEST_MODE", "1"); Environment.SetEnvironmentVariable("AGENT_PAL_STATE_DIR", state);
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-            TestValidation(Path.Combine(root, "validation")); TestLive(state);
+            TestValidation(Path.Combine(root, "validation")); TestLive(state); TestManualImport(state);
             WritePack(Path.Combine(root, "export-frames"), "export-demo", "0.1.0", Color.ForestGreen);
             Console.WriteLine("PASS data-only packs and live refresh: no real Claude calls, reminders, startup settings or user files modified.");
             return 0;

@@ -150,12 +150,12 @@ internal static class ClaudeBackgroundTests
         if (args[0] == "agents")
         {
             List<object> rows = new List<object> { new { id = "deadbeef", kind = "background", name = "other-user-job", state = "working", cwd = "C:/unrelated" } };
-            foreach (string file in Directory.GetFiles(root, "OrbitBg-*.json")) rows.Add(Read(file));
+            foreach (string file in Directory.GetFiles(root, "agent-pal-bg-*.json")) rows.Add(Read(file));
             Console.WriteLine(json.Serialize(rows)); return 0;
         }
         if (args[0] == "logs")
         {
-            foreach (string file in Directory.GetFiles(root, "OrbitBg-*.json"))
+            foreach (string file in Directory.GetFiles(root, "agent-pal-bg-*.json"))
                 if ((string)Read(file)["id"] == args[1]) { Console.WriteLine(File.Exists(file + ".logs") ? File.ReadAllText(file + ".logs") : "正在执行中文后台任务 ✅"); return 0; }
             return 1;
         }
