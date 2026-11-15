@@ -10,7 +10,7 @@ import tarfile
 import tempfile
 import unittest
 
-SOURCE = Path(__file__).resolve().parents[1] / "src/DesktopTasks/XianPal.Linux/package-linux.py"
+SOURCE = Path(__file__).resolve().parents[1] / "src/DesktopTasks/AgentPal.Linux/package-linux.py"
 SPEC = importlib.util.spec_from_file_location("linux_package", SOURCE)
 PACKAGE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PACKAGE)
@@ -18,7 +18,7 @@ SPEC.loader.exec_module(PACKAGE)
 
 class ArchiveTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="xianpal-package-test-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="agent-pal-package-test-")
         self.addCleanup(self.temporary.cleanup)
         self.base = Path(self.temporary.name)
         self.root = self.base / "published"
@@ -27,15 +27,15 @@ class ArchiveTests(unittest.TestCase):
         self.args = argparse.Namespace(folder=str(self.root), output=str(self.output), compat=False,
             source_commit="a" * 40,
             validation_url="https://github.com/example/example/actions/runs/1")
-        for name in ("xianpal.dll", "launch.sh", "install.sh", "diagnose-linux.sh", "xianpal.png",
+        for name in ("agent-pal.dll", "launch.sh", "install.sh", "diagnose-linux.sh", "agent-pal.png",
                      "LICENSE", "NOTICE", "ASSET-LICENSE.md", "libhostfxr.so", "libhostpolicy.so",
                      "libcoreclr.so", "System.Private.CoreLib.dll", "scenes/sect-hall-v2.png",
                      "fonts/NotoSansCJKsc-Regular.otf", "fonts/NotoColorEmoji.ttf",
                      "fonts/CJK-LICENSE.txt", "fonts/EMOJI-LICENSE.txt"):
             self.write(name, b"fixture")
-        self.write("xianpal", b"\x7fELF\x02\x01" + b"\0" * 12 + (62).to_bytes(2, "little"))
-        self.write("xianpal.deps.json", json.dumps({"libraries": {"xianpal/0.6.12": {}}}).encode())
-        self.write("xianpal.runtimeconfig.json", b'{"runtimeOptions":{"tfm":"net10.0"}}')
+        self.write("agent-pal", b"\x7fELF\x02\x01" + b"\0" * 12 + (62).to_bytes(2, "little"))
+        self.write("agent-pal.deps.json", json.dumps({"libraries": {"agent-pal/0.6.12": {}}}).encode())
+        self.write("agent-pal.runtimeconfig.json", b'{"runtimeOptions":{"tfm":"net10.0"}}')
         header = b"\x89PNG\r\n\x1a\n" + b"\0" * 8 + (384).to_bytes(4, "big") + (416).to_bytes(4, "big") + b"\x08\x06"
         for companion in ("orbit", "spark", "moss", "pippin"):
             frames = "assets" if companion == "orbit" else "assets/characters/" + companion
@@ -60,7 +60,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertTrue(Path(str(self.output) + ".sha256").read_text().startswith(checksum))
         with tarfile.open(self.output) as archive:
             for entry in archive:
-                if entry.name.endswith("/xianpal") or entry.name.endswith(".sh"):
+                if entry.name.endswith("/agent-pal") or entry.name.endswith(".sh"):
                     self.assertEqual(entry.mode, 0o755)
             metadata = next(e for e in archive.getmembers() if e.name.endswith("/VALIDATION.json"))
             self.assertEqual(json.load(archive.extractfile(metadata))["targetDesktopAcceptance"], "pending")
@@ -90,10 +90,10 @@ class ArchiveTests(unittest.TestCase):
         self.args.compat = True
         with self.assertRaisesRegex(ValueError, "runtime"):
             PACKAGE.build(self.args)
-        self.write("xianpal.runtimeconfig.json", b'{"runtimeOptions":{"tfm":"net8.0"}}')
+        self.write("agent-pal.runtimeconfig.json", b'{"runtimeOptions":{"tfm":"net8.0"}}')
         with self.assertRaisesRegex(ValueError, "private runtime"):
             PACKAGE.build(self.args)
-        self.write("xianpal", b"\x7fELF\x02\x01" + b"\0" * 12 + (183).to_bytes(2, "little"))
+        self.write("agent-pal", b"\x7fELF\x02\x01" + b"\0" * 12 + (183).to_bytes(2, "little"))
         with self.assertRaisesRegex(ValueError, "x64 only"):
             PACKAGE.build(self.args)
 
@@ -102,10 +102,10 @@ class ArchiveTests(unittest.TestCase):
         for kind in ("changed", "link"):
             path = self.base / (kind + ".tar.gz")
             with tarfile.open(path, "w:gz") as archive:
-                manifest = (checksum + "  xianpal\n").encode()
+                manifest = (checksum + "  agent-pal\n").encode()
                 entry = tarfile.TarInfo("candidate/SHA256SUMS.txt"); entry.size = len(manifest)
                 archive.addfile(entry, io.BytesIO(manifest))
-                entry = tarfile.TarInfo("candidate/xianpal"); entry.mode = 0o755
+                entry = tarfile.TarInfo("candidate/agent-pal"); entry.mode = 0o755
                 if kind == "link":
                     entry.type = tarfile.SYMTYPE; entry.linkname = "outside"
                     archive.addfile(entry)

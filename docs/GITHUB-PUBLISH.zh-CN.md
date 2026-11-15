@@ -1,14 +1,14 @@
 [English](GITHUB-PUBLISH.md)
 
-# 发布仙伴 0.6.11 预览版到 GitHub
+# 在 GitHub 发布 agent-pal
 
-目标仓库：<https://github.com/AHuaWinliver/xianpal-ai-companion>。
+目标仓库：<https://github.com/AHuaWinliver/agent-pal>。
 
 本指南只描述发布步骤；源码整理过程不会替你创建仓库、提交、推送或创建 Release。
 
 ## 准备发布目录
 
-优先使用 `dist/XianPal-0.6.11-Source.zip` 的解压内容作为初次提交目录。它只包含公开文件及校验清单，不含个人设置、任务、聊天、旧素材或备份。
+优先使用 `dist/agent-pal-<version>-Source.zip` 的解压内容作为初次提交目录。它只包含公开文件及校验清单，不含个人设置、任务、聊天、旧素材或备份。
 
 也可以直接提交当前源码根目录中的公开文件，但先检查 `.gitignore` 和 `git status`。不要从外层旧工作区整体上传，更不要提交 `build/`、`dist/`、`work/`、Claude 配置或 API 密钥。
 
@@ -35,8 +35,8 @@ git branch -M main
 git add .
 git status
 git diff --cached --stat
-git commit -m "Release XianPal 0.6.11"
-git remote add origin https://github.com/AHuaWinliver/xianpal-ai-companion.git
+git commit -m "Prepare agent-pal release"
+git remote add origin https://github.com/AHuaWinliver/agent-pal.git
 git push -u origin main
 ```
 
@@ -44,19 +44,14 @@ git push -u origin main
 
 ## 建议的仓库展示信息
 
-- **名称**：`xianpal-ai-companion`
+- **名称**：`agent-pal`
 - **About**：`国风 Q 版 AI 桌面伴侣，让 Claude Code 陪你聊天、处理文件与完成定时任务。A lively Windows AI companion powered by your local Claude Code CLI.`
 - **Topics**：`ai-companion`、`desktop-pet`、`claude-code`、`windows`、`csharp`、`winforms`、`productivity`、`virtual-pet`。
 - **Social preview**：在仓库设置中上传 `docs/images/social-preview.png`。该图采用现有角色素材制作，没有引入外部 IP 图片。
-- 主 README 为中文，`README.en.md` 为英文；所有展示图和动图采用仓库相对路径，不依赖本机绝对路径。
+- 主 README 为英文，`README.zh-CN.md` 为简体中文；所有展示图和动图采用仓库相对路径，不依赖本机绝对路径。
 
-## 发布 v0.6.11
+## 发布新版本
 
-在 Releases 中新建发布，使用标签 `v0.6.11` 和标题 `XianPal 0.6.11 Preview · 门派大堂角色清晰度`，标记为 **pre-release（预发布）**。引用 `CHANGELOG.md` 的 0.6.11 说明，并添加以下附件。
+同步更新 `VERSION`、应用与安装器的程序集版本及变更日志。为通过验证的提交创建 `v<version>` 标签，在 GitHub Release 附上安装包、源码包和 SHA256 校验清单。发布说明以英文为主，并附简体中文。已有版本的附件保留原样。
 
-- `XianPal-0.6.11-Setup.exe` 为 Windows 安装器，校验值见 `SHA256SUMS.txt`。
-- `XianPal-0.6.11-Source.zip` 包含原画、构建工具、测试和文档，校验值见 `XianPal-0.6.11-Source.zip.sha256`。
-
-说明安装器未签名、AI 需用户自行配置 CLI、可能消耗模型额度、虚拟桌面与 Background 依赖环境，以及安装会修改当前用户的 Hooks。
-
-0.6.11 按公开预览版发布。发布前审阅素材授权和敏感信息，按清单检查构建与附件。[发布检查清单](RELEASE-CHECKLIST.zh-CN.md)
+Linux 发布需完成发行版矩阵及目标机的图形桌面验收。[发布检查清单](RELEASE-CHECKLIST.zh-CN.md)

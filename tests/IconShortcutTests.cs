@@ -20,9 +20,9 @@ internal static class IconShortcutTests
         {
             string app = Path.GetFullPath(args[0]), installer = Path.GetFullPath(args[1]);
             string directory = Path.GetDirectoryName(app);
-            Require(Environment.GetEnvironmentVariable("FUFU_TEST_MODE") == "1" && directory.Contains("desktop-package-test"), "isolated installer state required");
+            Require(Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") == "1" && directory.Contains("desktop-package-test"), "isolated installer state required");
             string version = AssemblyName.GetAssemblyName(app).Version.ToString(3);
-            string iconPath = Path.Combine(directory, "OrbitPet-" + version + ".ico");
+            string iconPath = Path.Combine(directory, "agent-pal-" + version + ".ico");
             ValidateIcon(iconPath);
             using (Icon embedded = Icon.ExtractAssociatedIcon(app))
             using (Bitmap bitmap = embedded.ToBitmap()) CheckBitmap(bitmap, "application executable embedded icon");
@@ -30,7 +30,7 @@ internal static class IconShortcutTests
             using (Bitmap bitmap = embedded.ToBitmap()) CheckBitmap(bitmap, "installer executable embedded icon");
 
             Assembly appAssembly = Assembly.LoadFrom(app);
-            MethodInfo render = appAssembly.GetType("XianPal.AppIcon").GetMethod("CreateBitmap", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo render = appAssembly.GetType("AgentPal.AppIcon").GetMethod("CreateBitmap", BindingFlags.Static | BindingFlags.NonPublic);
             List<string> images = new List<string> { Path.Combine(directory, "assets", "idle", "00.png") };
             foreach (string character in Directory.GetDirectories(Path.Combine(directory, "assets", "characters"))) images.Add(Path.Combine(character, "idle", "00.png"));
             foreach (string path in images)
@@ -38,13 +38,13 @@ internal static class IconShortcutTests
                 using (Bitmap bitmap = (Bitmap)render.Invoke(null, new object[] { source, 32 })) CheckBitmap(bitmap, "character tray icon " + Path.GetDirectoryName(Path.GetDirectoryName(path)));
             Require(images.Count == 4, "all 4 cultivation companion tray icons checked");
 
-            Environment.SetEnvironmentVariable("FUFU_INSTALL_ROOT", directory);
-            Type program = Assembly.LoadFrom(installer).GetType("XianPal.Installer.Program");
+            Environment.SetEnvironmentVariable("AGENT_PAL_INSTALL_ROOT", directory);
+            Type program = Assembly.LoadFrom(installer).GetType("AgentPal.Installer.Program");
             MethodInfo hookMatch = program.GetMethod("IsPetHookCommand", BindingFlags.Static | BindingFlags.NonPublic);
             MethodInfo hookBuild = program.GetMethod("BuildHookCommand", BindingFlags.Static | BindingFlags.NonPublic);
             string ownHook = (string)hookBuild.Invoke(null, new object[] { "Stop" });
             Require((bool)hookMatch.Invoke(null, new object[] { ownHook }), "encoded owned hook recognized");
-            Require(!(bool)hookMatch.Invoke(null, new object[] { "echo OrbitPet --hook Stop" }), "foreign similarly named hook retained");
+            Require(!(bool)hookMatch.Invoke(null, new object[] { "echo agent-pal --hook Stop" }), "foreign similarly named hook retained");
             Require(!(bool)hookMatch.Invoke(null, new object[] { "echo '" + app + "'" }), "path mention without hook is not owned");
             var mixed = new System.Collections.Hashtable { { "matcher", "test" }, { "hooks", new object[] {
                 new System.Collections.Hashtable { { "command", ownHook } },
@@ -53,7 +53,7 @@ internal static class IconShortcutTests
             program.GetMethod("RemoveManagedHookGroups", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { groups });
             Require(groups.Count == 1 && ((object[])mixed["hooks"]).Length == 1 && (string)((System.Collections.IDictionary)((object[])mixed["hooks"])[0])["command"] == "echo keep-user-hook", "mixed hook group preserves unrelated handlers");
             program.GetMethod("ValidateInstallLocation", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { true });
-            Require(File.ReadAllText(Path.Combine(directory, ".orbitpet-install")) == "OrbitPet:3", "installation ownership marker validated");
+            Require(File.ReadAllText(Path.Combine(directory, ".agent-pal-install")) == "agent-pal:3", "installation ownership marker validated");
             string linkPath = (string)program.GetProperty("StartMenuShortcut", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null, null);
             Require(linkPath.StartsWith(directory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase), "test shortcut cannot touch real Start menu");
             object shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell", true));

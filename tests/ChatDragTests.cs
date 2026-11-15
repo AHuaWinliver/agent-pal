@@ -4,7 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 internal static class ChatDragTests
 {
     private static object Call(object target,string method,params object[] args){return target.GetType().GetMethod(method,BindingFlags.NonPublic|BindingFlags.Instance).Invoke(target,args);}
@@ -30,8 +30,8 @@ internal static class ChatDragTests
             Check(desktop.Contains(edge.Pet)&&desktop.Contains(edge.Dialog)&&edge.Dialog.Top==edge.Pet.Bottom+8&&edge.Dialog.Left+edge.Dialog.Width/2==edge.Pet.Left+edge.Pet.Width/2,"bottom/right opening moves group inward and never flips above");
             foreach(Rectangle monitor in new[]{new Rectangle(-1280,0,1280,1024),new Rectangle(2560,-800,1280,1024),new Rectangle(0,0,800,600)})
             {var anchored=ChatAnchorLayout.Below(new Rectangle(monitor.Left+40,monitor.Bottom-120,96,104),new Size(640,650),monitor);Check(monitor.Contains(anchored.Pet)&&monitor.Contains(anchored.Dialog)&&anchored.Dialog.Top==anchored.Pet.Bottom+8,"below placement stays on target monitor: "+monitor);}
-            Check(typeof(PetForm).Assembly.GetType("XianPal.FaceSculpt")==null&&typeof(PetForm).Assembly.GetType("XianPal.FaceSculptForm")==null&&typeof(PetForm).GetMethod("LoadFaceShapes",BindingFlags.Instance|BindingFlags.NonPublic)==null,"removed feature types and startup hooks absent from assembly");
-            string legacyFile=Path.Combine(Environment.GetEnvironmentVariable("FUFU_STATE_DIR"),"face-shapes.json");Directory.CreateDirectory(Path.GetDirectoryName(legacyFile));File.WriteAllText(legacyFile,"{ malformed legacy file intentionally ignored");
+            Check(typeof(PetForm).Assembly.GetType("AgentPal.FaceSculpt")==null&&typeof(PetForm).Assembly.GetType("AgentPal.FaceSculptForm")==null&&typeof(PetForm).GetMethod("LoadFaceShapes",BindingFlags.Instance|BindingFlags.NonPublic)==null,"removed feature types and startup hooks absent from assembly");
+            string legacyFile=Path.Combine(Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR"),"face-shapes.json");Directory.CreateDirectory(Path.GetDirectoryName(legacyFile));File.WriteAllText(legacyFile,"{ malformed legacy file intentionally ignored");
             Rectangle dialog=new Rectangle(500,300,640,650),petBox=new Rectangle(772,190,96,104),area=new Rectangle(0,0,1920,1040);
             Check(ChatWindowDrag.Constrain(dialog,petBox,new Point(540,335),area)==new Point(540,335),"free group movement preserves requested delta");
             Fits(dialog,petBox,new Point(-3000,-3000),area,"top/left edge keeps both windows visible");

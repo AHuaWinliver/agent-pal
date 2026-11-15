@@ -1,12 +1,12 @@
 <div align="center">
 
-# 仙伴 XianPal
+# agent-pal agent-pal
 
 **连接本机 Claude Code 的 Windows AI 桌面伴侣。**
 
-[English](README.md) · [快速开始](#quick-start) · [功能](#features) · [定制角色](#custom-characters) · [下载](https://github.com/AHuaWinliver/xianpal-ai-companion/releases)
+[English](README.md) · [快速开始](#quick-start) · [功能](#features) · [定制角色](#custom-characters) · [下载](https://github.com/AHuaWinliver/agent-pal/releases)
 
-<img src="docs/images/hero.png" alt="仙伴的四位原创国风 Q 版桌面伙伴" width="100%">
+<img src="docs/images/hero.png" alt="agent-pal的四位原创国风 Q 版桌面伙伴" width="100%">
 
 </div>
 
@@ -15,7 +15,7 @@
 <a id="quick-start"></a>
 ## 快速开始
 
-1. 在 Windows 10 / 11 上下载并运行 `XianPal-*-Setup.exe`，按发布页提供的 SHA256 核对文件。需要仓库中的最新功能时，可以[从源码构建](#build)。[GitHub Releases](https://github.com/AHuaWinliver/xianpal-ai-companion/releases)
+1. 在 Windows 10 / 11 上下载并运行 `agent-pal-*-Setup.exe`，按发布页提供的 SHA256 核对文件。需要仓库中的最新功能时，可以[从源码构建](#build)。[GitHub Releases](https://github.com/AHuaWinliver/agent-pal/releases)
 2. 使用 AI 功能前，先在终端确认本机 `claude` 能启动并连接你配置的服务。桌面互动与本地提醒可独立使用。
 3. 右键宠物，从 **默认设置** 选择工作目录和 Claude 配置。双击回复气泡可继续对话，右键托盘图标可隐藏或找回宠物。
 
@@ -39,7 +39,7 @@
 
 双击回复气泡，在角色下方打开对话。你的消息靠右，道友回复靠左，正文可选择和复制。拖动对话标题可让窗口和角色一起移动。把文件或文件夹拖给宠物，确认需求与工作目录后再发送给 Claude Code。
 
-![仙伴的左右对话气泡与回复输入框](docs/images/chat-bubbles.png)
+![agent-pal的左右对话气泡与回复输入框](docs/images/chat-bubbles.png)
 
 ### 定时任务与运行记录
 
@@ -89,7 +89,7 @@
 
 <img src="docs/images/characters.png" alt="青衡、绯笺、苍芷与墨黑灵龟小墨的角色素材" width="100%">
 
-右键选择 **切换形象 → 打开角色资源目录**，复制完整的角色包。仙伴会校验资源并自动加载，适合在安装后添加或更新角色。
+右键选择 **切换形象 → 打开角色资源目录**，复制完整的角色包。agent-pal会校验资源并自动加载，适合在安装后添加或更新角色。
 
 1. 复制[人物定制规格单](docs/templates/CHARACTER-SPEC.zh-CN.md)和[角色配置模板](docs/templates/character-profile.json)，定义造型、人设、台词、素材来源和提醒风格。
 2. 绘制透明动作帧，检查双向步态、关节连接、表情和画面边缘。双足动作采用对侧手脚，四足动作采用对角交替。外置角色使用自己的动作帧与内置演绎时间线。
@@ -104,7 +104,7 @@
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
-.\build\payload\OrbitPet.exe
+.\build\payload\agent-pal.exe
 ```
 
 安装包在 `dist/`，动作和演出预览在 `build/previews/`。只需要程序和预览时，可给构建脚本加上 `-SkipInstaller`。[开发与验证指南](docs/DEVELOPMENT.zh-CN.md)
@@ -117,7 +117,7 @@ Linux 桌面端在 `linux` 分支开发，覆盖 x86_64 与 ARM64，并提供面
 
 ## 贡献
 
-欢迎贡献原创角色、动画工具、桌面体验修复、测试和翻译。通过 [Issues](https://github.com/AHuaWinliver/xianpal-ai-companion/issues) 讨论改动，再按[贡献指南](CONTRIBUTING.md)提交。大功能更新需同步提供中英文 README 图文说明。
+欢迎贡献原创角色、动画工具、桌面体验修复、测试和翻译。通过 [Issues](https://github.com/AHuaWinliver/agent-pal/issues) 讨论改动，再按[贡献指南](CONTRIBUTING.md)提交。大功能更新需同步提供中英文 README 图文说明。
 
 ## 隐私与许可
 

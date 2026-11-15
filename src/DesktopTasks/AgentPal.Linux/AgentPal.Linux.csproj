@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework Condition="'$(LinuxCompat)' == 'true'">net8.0</TargetFramework>
+    <AvaloniaVersion>12.1.5</AvaloniaVersion>
+    <AvaloniaVersion Condition="'$(LinuxCompat)' == 'true'">11.3.22</AvaloniaVersion>
+    <DefineConstants Condition="'$(LinuxCompat)' == 'true'">$(DefineConstants);AGENT_PAL_LINUX_COMPAT</DefineConstants>
+    <AssemblyName>agent-pal</AssemblyName>
+    <RootNamespace>AgentPal</RootNamespace>
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../../../VERSION').Trim())</Version>
+    <DefineConstants>$(DefineConstants);AGENT_PAL_LINUX</DefineConstants>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <FontAssetsPath>$(MSBuildProjectDirectory)/../../../build/linux-resources/fonts</FontAssetsPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+    <Compile Include="../AgentPal/ClaudeCliRunner.cs;../AgentPal/ClaudeSettingsFile.cs;../AgentPal/ClaudeTaskService.cs;../AgentPal/ClaudeTaskStreamRenderer.cs;../AgentPal/IntegrationPreferences.cs;../AgentPal/ReminderService.cs;../AgentPal/CompanionRolePresets.cs;../AgentPal/PetCharacter.cs;../AgentPal/PetBrain.cs;../AgentPal/SectWorkshop.cs;../AgentPal/DragGaitClock.cs;../AgentPal/CharacterPackCatalog.cs" LinkBase="Shared" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../AgentPal/NativeTaskHooks.cs;../AgentPal/VisibleTaskMonitor.cs;../AgentPal/BackgroundTaskSupervisor.cs;../AgentPal/UiLanguage.cs;../AgentPal/TaskPresentation.cs;../AgentPal/CompanionRoutes.cs;../AgentPal/ArtifactTravelClock.cs;../AgentPal/WalkingExpressionClock.cs;../AgentPal/ReminderPerformanceTimeline.cs;../AgentPal/SectHallLayout.cs" LinkBase="Shared" />
+    <AvaloniaResource Include="$(FontAssetsPath)/*.otf;$(FontAssetsPath)/*.ttf" Link="Fonts/%(Filename)%(Extension)" />
+    <Content Include="launch.sh;diagnose-linux.sh;install.sh" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../../LICENSE;../../../NOTICE;../../../ASSET-LICENSE.md" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="RequireBundledFonts" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(FontAssetsPath)/NotoSansCJKsc-Regular.otf') Or !Exists('$(FontAssetsPath)/NotoColorEmoji.ttf')" Text="Prepare bundled fonts before building: python3 src/DesktopTasks/AgentPal.Linux/fetch-fonts.py build/linux-resources/fonts" />
+  </Target>
+</Project>

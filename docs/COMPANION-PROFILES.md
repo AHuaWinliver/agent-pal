@@ -13,7 +13,7 @@ Open **Default settings** from the companion's context menu. Settings open in a 
 
 An empty companion field inherits its corresponding global field. An empty global executable field uses local discovery; an empty global settings field uses Claude's own defaults. These two fields inherit independently. An explicitly configured missing executable or invalid settings file produces an error rather than silently changing the selected profile.
 
-The selection applies to conversations opened by XianPal, manual CLI windows and scheduled runs assigned to that companion. Changing profiles in the settings window keeps unsaved field edits until you apply or cancel. Changes to settings do not reconfigure CLI processes that are already running.
+The selection applies to conversations opened by agent-pal, manual CLI windows and scheduled runs assigned to that companion. Changing profiles in the settings window keeps unsaved field edits until you apply or cancel. Changes to settings do not reconfigure CLI processes that are already running.
 
 ## Assign and review tasks
 

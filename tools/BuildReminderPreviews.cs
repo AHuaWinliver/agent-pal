@@ -6,7 +6,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
-using XianPal;
+using AgentPal;
 
 internal static class BuildReminderPreviews
 {
@@ -155,7 +155,7 @@ internal static class BuildReminderPreviews
     private static string Page()
     {
         return @"<!doctype html><html lang='zh-CN'><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width,initial-scale=1'><title>仙伴 · 四境报时</title>
+<meta name='viewport' content='width=device-width,initial-scale=1'><title>agent-pal · 四境报时</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#efeee8;color:#243e42;font:14px 'Microsoft YaHei UI',sans-serif}header{max-width:1180px;margin:28px auto 18px;padding:0 20px}h1{font-size:27px;margin:0 0 10px}header p{color:#627475;line-height:1.8}nav{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}button{font:inherit;border:1px solid #c7d5ce;border-radius:12px;padding:10px 17px;background:#fafbf6;color:#34514f;cursor:pointer}button[aria-pressed=true]{background:#244d50;color:white}main{margin:0 auto 30px;max-width:1180px;padding:0 20px}.stage{position:relative;aspect-ratio:16/9;overflow:hidden;border:1px solid #d0d9d1;border-radius:24px;background:radial-gradient(ellipse at 50% 90%,#e6ded1,transparent 65%),linear-gradient(150deg,#f9f7f0,#e2eeeb);box-shadow:0 20px 60px #274e4e14}.window{position:absolute;left:6%;top:10%;width:88%;height:78%;border:1px solid #fff9;background:#fff5;border-radius:15px;box-shadow:0 16px 50px #25504d0b;padding:16px;color:#82928e;font-size:12px}.window:before{content:'● ● ●　 本地桌面预览';display:block;border-bottom:1px solid #cbd9d16b;padding-bottom:12px}.ghost{width:38%;height:8px;background:#a6b9b126;margin-top:30px;border-radius:9px}canvas{position:absolute;inset:0;width:100%;height:100%}.card{position:absolute;display:none;left:50%;bottom:5%;transform:translateX(-50%);width:48%;padding:17px;border-radius:16px;background:#fffefa;box-shadow:0 8px 30px #2144431a;border:1px solid #d7ded5;font-size:clamp(10px,1.2vw,14px)}.card strong{color:#337375}.card p{margin:12px 0 6px;font-weight:600}.card small{color:#77857e}.actions{display:flex;justify-content:flex-end;gap:7px;margin-top:14px}.actions span{background:#263d3d;color:white;padding:6px 12px;border-radius:7px}.actions span:first-child{background:#ecf0ea;color:#66736d}footer{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;color:#647a76}#seek{flex:1;min-width:160px;accent-color:#317b78}#loading{position:absolute;top:15px;right:20px;color:#658079;font-size:12px}kbd{background:#fff9;border:1px solid #ccd6cc;border-radius:4px;padding:1px 5px}a{color:#367b77}
 </style><header><h1>四境报时 · 角色专属全屏演绎</h1><p>使用程序同一套渲染逻辑导出 · 原画与手臂层级保持不变 · 半透明柔光，无碎屏、无强闪光<br>入场 → 施展 → 收势 → 事项提醒；正式程序中可按 Esc 跳过，也可选择“仅提示框”。</p><nav id='roles'></nav></header>

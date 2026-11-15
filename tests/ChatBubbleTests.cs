@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 internal static class ChatBubbleTests
 {
     private static void Check(bool ok,string name){if(!ok)throw new Exception(name);Console.WriteLine("PASS "+name);}
@@ -13,7 +13,7 @@ internal static class ChatBubbleTests
     {
         try
         {
-            Application.EnableVisualStyles();string root=Environment.GetEnvironmentVariable("FUFU_STATE_DIR");Directory.CreateDirectory(root);
+            Application.EnableVisualStyles();string root=Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR");Directory.CreateDirectory(root);
             var a=new ActivityRecord {Title="今天一起做些什么？",CharacterId="orbit",SessionId=Guid.NewGuid().ToString(),State="就绪",Updated=DateTime.Now,Output="你：今天一起做些什么？\r\n\r\n"};
             a.StartConversation("今天一起做些什么？");a.AppendOutput("道友好。先把今天最重要的一件事告诉我，我们一起慢慢理清。🍵\n\n我可以陪你规划日程，也能帮你检查项目、整理文件。");
             a.AppendUserPrompt("先帮我把项目计划列出来，要留一点休息时间 😊");a.AppendOutput("好，我们把事情分成三步：\n\n1. 明确目标与今天可用的时间。\n2. 拆成两三个能完成的小任务。\n3. 每完成一段，留几分钟休息。\n\n你希望先做哪一项？");

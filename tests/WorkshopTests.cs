@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
-using XianPal;
+using AgentPal;
 internal static class WorkshopTests
 {
     private sealed class Fake : ISectAgent
@@ -32,7 +32,7 @@ internal static class WorkshopTests
     {
         try
         {
-            string root=Environment.GetEnvironmentVariable("FUFU_STATE_DIR");if(String.IsNullOrWhiteSpace(root))throw new Exception("isolated state required");
+            string root=Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR");if(String.IsNullOrWhiteSpace(root))throw new Exception("isolated state required");
             Directory.CreateDirectory(Path.Combine(root,"a"));Directory.CreateDirectory(Path.Combine(root,"b"));
             var agents=new List<Fake>();Func<ISectAgent> factory=delegate {var f=new Fake();agents.Add(f);return f;};
             var preset=CompanionRolePresets.Create("四道友研发",root,false);

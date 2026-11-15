@@ -2,14 +2,14 @@
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
 $version=[IO.File]::ReadAllText((Join-Path $projectRoot 'VERSION')).Trim()
-$installer=Join-Path $projectRoot ('dist/XianPal-'+$version+'-Setup.exe')
+$installer=Join-Path $projectRoot ('dist/agent-pal-'+$version+'-Setup.exe')
 if(-not(Test-Path -LiteralPath $installer)){throw 'Build first'}
-$fixture=Join-Path ([IO.Path]::GetTempPath()) ('xianpal-hall-install-test-'+[Guid]::NewGuid().ToString('N'))
+$fixture=Join-Path ([IO.Path]::GetTempPath()) ('agent-pal-hall-install-test-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixture | Out-Null
 $saved=@{}
-foreach($name in @('FUFU_TEST_MODE','FUFU_INSTALL_ROOT','FUFU_CLAUDE_CONFIG_DIR','FUFU_STATE_DIR')){$saved[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
+foreach($name in @('AGENT_PAL_TEST_MODE','AGENT_PAL_INSTALL_ROOT','AGENT_PAL_CLAUDE_CONFIG_DIR','AGENT_PAL_STATE_DIR')){$saved[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
 try{
-    $env:FUFU_TEST_MODE='1';$env:FUFU_INSTALL_ROOT=Join-Path $fixture 'app';$env:FUFU_CLAUDE_CONFIG_DIR=Join-Path $fixture 'claude';$env:FUFU_STATE_DIR=Join-Path $fixture 'state'
+    $env:AGENT_PAL_TEST_MODE='1';$env:AGENT_PAL_INSTALL_ROOT=Join-Path $fixture 'app';$env:AGENT_PAL_CLAUDE_CONFIG_DIR=Join-Path $fixture 'claude';$env:AGENT_PAL_STATE_DIR=Join-Path $fixture 'state'
     function Install-Fixture {
         $diagnostics=Join-Path $fixture 'installer-stderr.txt'
         $process=Start-Process -FilePath $installer -ArgumentList '--silent' -WorkingDirectory $fixture -WindowStyle Hidden -RedirectStandardError $diagnostics -Wait -PassThru
@@ -17,16 +17,16 @@ try{
             $detail=Get-Content -LiteralPath $diagnostics -Raw -Encoding utf8
             throw ('Isolated installation failed ('+$process.ExitCode+'): '+$detail)
         }
-        $shortcut=Join-Path $env:FUFU_INSTALL_ROOT 'test-start-menu/仙伴 AI桌面伴侣/仙伴 AI桌面伴侣.lnk'
+        $shortcut=Join-Path $env:AGENT_PAL_INSTALL_ROOT 'test-start-menu/agent-pal/agent-pal.lnk'
         if(-not(Test-Path -LiteralPath $shortcut -PathType Leaf)){throw 'Chinese Start menu shortcut missing after installation'}
     }
     Install-Fixture
-    $scene=Join-Path $env:FUFU_INSTALL_ROOT 'scenes/sect-hall-v2.png'
+    $scene=Join-Path $env:AGENT_PAL_INSTALL_ROOT 'scenes/sect-hall-v2.png'
     if(-not(Test-Path -LiteralPath $scene)){throw 'Scene folder missing after real installation'}
     $expected=(Get-FileHash -LiteralPath (Join-Path $projectRoot 'art/scenes/sect-hall-v2.png')).Hash
     if((Get-FileHash -LiteralPath $scene).Hash -ne $expected){throw 'Installed scene differs from approved art'}
     Write-Output 'PASS fresh installation actually deploys scenes folder and exact hall art'
-    $helper=Join-Path $env:FUFU_INSTALL_ROOT 'HallSceneCheck.exe'
+    $helper=Join-Path $env:AGENT_PAL_INSTALL_ROOT 'HallSceneCheck.exe'
     $compiler=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
     & $compiler /nologo /target:exe /out:$helper /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll (Join-Path $PSScriptRoot 'HallSceneTests.cs')
     if($LASTEXITCODE -ne 0){throw 'Installed hall probe failed to compile'}

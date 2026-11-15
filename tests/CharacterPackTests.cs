@@ -12,7 +12,7 @@ using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 
 internal static class CharacterPackTests
 {
@@ -163,9 +163,9 @@ internal static class CharacterPackTests
     {
         try
         {
-            if (args.Length != 1 || !Path.GetFileName(args[0]).StartsWith("xianpal-character-pack-test-", StringComparison.Ordinal)) throw new Exception("isolated fixture directory required");
+            if (args.Length != 1 || !Path.GetFileName(args[0]).StartsWith("agent-pal-character-pack-test-", StringComparison.Ordinal)) throw new Exception("isolated fixture directory required");
             string root = Path.GetFullPath(args[0]), state = Path.Combine(root, "state"); Directory.CreateDirectory(state);
-            Environment.SetEnvironmentVariable("FUFU_TEST_MODE", "1"); Environment.SetEnvironmentVariable("FUFU_STATE_DIR", state);
+            Environment.SetEnvironmentVariable("AGENT_PAL_TEST_MODE", "1"); Environment.SetEnvironmentVariable("AGENT_PAL_STATE_DIR", state);
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             TestValidation(Path.Combine(root, "validation")); TestLive(state);
             WritePack(Path.Combine(root, "export-frames"), "export-demo", "0.1.0", Color.ForestGreen);

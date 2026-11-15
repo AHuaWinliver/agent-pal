@@ -1,0 +1,522 @@
+// SPDX-License-Identifier: Apache-2.0
+using System.Diagnostics;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+
+namespace AgentPal.Linux;
+
+internal sealed class DesktopPreferences
+{
+    public string Character { get; set; } = "orbit";
+    public string Directory { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    public bool Topmost { get; set; } = true;
+    public bool ReduceMotion { get; set; }
+    public double DockedOpacity { get; set; } = .6;
+    public int Size { get; set; } = 144;
+    public int? X { get; set; }
+    public int? Y { get; set; }
+    public string PathMode { get; set; } = "builtin";
+    public bool ProactiveCare { get; set; }
+    public int BreakMinutes { get; set; } = 60;
+    public double TrailOpacity { get; set; } = .45;
+    public string DockedEdge { get; set; } = "";
+}
+
+internal sealed partial class PetWindow : Window
+{
+    internal static string Assets => Environment.GetEnvironmentVariable("AGENT_PAL_ASSETS") ?? Path.Combine(AppContext.BaseDirectory, "assets");
+    private static string PreferencesPath => Path.Combine(Program.StateDirectory, "desktop.json");
+    private readonly DesktopPreferences preferences;
+    private readonly CharacterPackCatalog catalog;
+    private readonly DesktopServices services;
+    private LinuxDesktopShell shell;
+    private bool started;
+    private readonly Image sprite = new() { Stretch = Stretch.Uniform };
+    private readonly NativeExpressionView expressions = new();
+    private readonly DragGaitClock gait = new();
+    private readonly Stopwatch clock = Stopwatch.StartNew();
+    private readonly DispatcherTimer timer;
+    private readonly Dictionary<string, Bitmap> frames = new();
+    private CharacterAnimationSet externalFrames;
+    private ConversationWindow conversation;
+    private Window reply;
+    private TextBlock replyLabel;
+    private string currentReply;
+    private IPointer dragPointer;
+    private PixelPoint dragOrigin, pointerOrigin, lastPointer;
+    private long lastMotion, lastTick, gestureEnd, gestureStarted, nextRoam, roamStart;
+    private bool left, dragging, hovering, positioning;
+    private string gesture = "waving";
+    private PixelPoint? roamTarget;
+
+    internal PetCharacter Character { get; private set; }
+    internal string DirectoryPath => preferences.Directory;
+    internal bool ChatWorking { get; set; }
+    internal bool IsClosing { get; private set; }
+    internal ConversationWindow Conversation => conversation;
+    internal DesktopServices Services => services;
+    internal void SelectCharacter(PetCharacter character) => LoadCharacter(character);
+
+    internal PetWindow()
+    {
+        preferences = WorkshopFiles.Load<DesktopPreferences>(PreferencesPath);
+        preferences.BreakMinutes = Math.Clamp(preferences.BreakMinutes, 5, 240);
+        preferences.TrailOpacity = Math.Clamp(preferences.TrailOpacity, 0, 1);
+        if (!Directory.Exists(preferences.Directory)) preferences.Directory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        catalog = new CharacterPackCatalog(Path.Combine(NativePaths.UserDirectory("XDG_DATA_HOME", ".local", "share"), "Characters"));
+        InitializeCharacterCatalog();
+        Title = "agent-pal";
+        Width = Math.Clamp(preferences.Size, 80, 260); Height = Width * 416 / 384;
+        CanResize = false;
+        DesktopUi.RemoveDecorations(this);
+        TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent };
+        TransparencyBackgroundFallback = new SolidColorBrush(Color.Parse("#F6F1E7"));
+        Background = Brushes.Transparent;
+        Topmost = preferences.Topmost;
+        var layers = new Grid { Background = Brushes.Transparent };
+        layers.Children.Add(sprite); layers.Children.Add(artifact); layers.Children.Add(expressions); Content = layers;
+        PointerEntered += (_, _) => { if (!hovering && !ChatWorking) Gesture("waving", 700); hovering = true; };
+        PointerExited += (_, _) => hovering = false;
+        PointerPressed += Pressed;
+        PointerMoved += Moved;
+        PointerReleased += Released;
+        PointerCaptureLost += (_, _) => FinishDrag();
+        PositionChanged += (_, _) => AnchorReply();
+        DragDrop.SetAllowDrop(this, true);
+        DragDrop.AddDragOverHandler(this, (_, e) => e.DragEffects = e.DataTransfer.Formats.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None);
+        DragDrop.AddDropHandler(this, Dropped);
+        ContextMenu = BuildMenu();
+        services = new DesktopServices(() => Character);
+        services.Reminders.ReminderDue += reminder => ReminderWindows.ShowAlert(this, services.Reminders, reminder, preferences.ReduceMotion);
+        services.EventDue += plan =>
+        {
+            var dialog = DesktopUi.Dialog("事件到点", DesktopUi.Stack(DesktopUi.DataLabel(plan.Title),
+                DesktopUi.Action("查看事件和门派", () => WorkshopWindow.Show(this, services, plan.Sect))), 410, 180);
+            dialog.Show(this);
+        };
+        services.Failure += message => DesktopUi.Notice(this, "门派运行暂停", message);
+        timer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, (_, _) => Animate());
+        Opened += (_, _) =>
+        {
+            if (started) return;
+            started = true;
+            PixelRect area = Screens.Primary?.WorkingArea ?? new PixelRect(0, 0, 1024, 768);
+            Position = Fit(new PixelPoint(preferences.X ?? area.Right - (int)Width - 30, preferences.Y ?? area.Bottom - (int)Height - 45));
+            if (preferences.DockedEdge is "left" or "right" or "bottom") ApplyDock(preferences.DockedEdge);
+            nextRoam = clock.ElapsedMilliseconds + Random.Shared.Next(12000, 22000);
+            timer.Start();
+            services.Start();
+            shell = new LinuxDesktopShell(this);
+        };
+        Closing += (_, _) => IsClosing = true;
+        Closed += (_, _) =>
+        {
+            timer.Stop();
+            shell?.Dispose();
+            services.Dispose();
+            ClaudeCliRunner request = brain; brain = null; request?.Stop(); request?.Dispose();
+            trail?.Close();
+            expressions.Dispose();
+            DisposeCharacterScans();
+            externalFrames?.Dispose();
+            DisposeFrames();
+        };
+    }
+
+    private void Save()
+    {
+        preferences.X = Position.X; preferences.Y = Position.Y;
+        WorkshopFiles.Save(PreferencesPath, preferences);
+    }
+
+    private void DisposeFrames()
+    {
+        artifact.Clear();
+        foreach (Bitmap image in frames.Values) image.Dispose();
+        frames.Clear();
+    }
+
+    private void LoadCharacter(PetCharacter next)
+    {
+        CharacterAnimationSet replacement = null;
+        if (next.IsExternal) next = CharacterPackCatalog.ReadPack(next.ResourceRoot, true, out replacement);
+        sprite.Source = null;
+        DisposeFrames();
+        externalFrames?.Dispose();
+        externalFrames = replacement;
+        Character = next;
+        ResetCharacterBehavior();
+        preferences.Character = next.Id;
+        RenderFrame("idle", 0);
+    }
+
+    private void RenderFrame(string state, int index)
+    {
+        expressions.Update(Character, state, index);
+        if (externalFrames != null) { sprite.Source = externalFrames.Frames[state][index]; return; }
+        string key = state + "/" + index.ToString("00") + ".png";
+        if (!frames.TryGetValue(key, out Bitmap frame))
+        {
+            string root = Character.Id == "orbit" ? Assets : Path.Combine(Assets, "characters", Character.Id);
+            frame = new Bitmap(Path.Combine(root, key));
+            frames.Add(key, frame);
+        }
+        sprite.Source = frame;
+    }
+
+    private void Gesture(string name, int milliseconds)
+    {
+        if (preferences.ReduceMotion) return;
+        gesture = name;
+        gestureStarted = clock.ElapsedMilliseconds;
+        gestureEnd = clock.ElapsedMilliseconds + milliseconds;
+    }
+
+    private void Animate()
+    {
+        long now = clock.ElapsedMilliseconds;
+        if (!IsVisible) { lastTick = now; return; }
+        double elapsed = Math.Min(50, now - lastTick);
+        lastTick = now;
+        ConsumeCharacterScan();
+        if (now / 8000 != (now - (long)elapsed) / 8000) Rescan();
+        TickCare(now);
+        if (preferences.ReduceMotion) { CancelMotion(); RenderFrame(ChatWorking ? "waiting" : "idle", 0); return; }
+        if (dragging)
+        {
+            double age = now - lastMotion;
+            int frame = gait.Advance(elapsed, age, 24);
+            if (age < DragGaitClock.StopAfterMs) RenderFrame(left ? "running-left" : "running-right", frame);
+            else RenderFrame("idle", 0);
+            return;
+        }
+        if (!dragging && ((string.IsNullOrEmpty(preferences.DockedEdge) && (!hovering || now < allowHoverUntil) && !ChatWorking && conversation?.IsVisible != true) || urgentRoute) && Opacity == 1)
+        {
+            if (roamTarget == null && now >= nextRoam) StartRoam();
+            if (TickRoam(now, elapsed)) return;
+        }
+        else if (!dragging) CancelMotion();
+        string state = ChatWorking ? "waiting" : now < gestureEnd ? gesture : "idle";
+        int count = CharacterPackCatalog.FrameCount(state);
+        int index = !ChatWorking && now < gestureEnd ? Math.Clamp((int)((now - gestureStarted) * count / Math.Max(1, gestureEnd - gestureStarted)), 0, count - 1) : (int)(now / (count == 8 ? 480 : 37) % count);
+        RenderFrame(state, index);
+    }
+
+    private void StartRoam()
+    {
+        long now = clock.ElapsedMilliseconds;
+        nextRoam = now + Random.Shared.Next(16000, 35000);
+        roamStart = now;
+        if (preferences.PathMode == "ai") { StartTour(); return; }
+        BeginRoute(new[] { Fit(new PixelPoint(Position.X + Random.Shared.Next(-150, 151), Position.Y + Random.Shared.Next(-50, 51))) });
+    }
+
+    private PixelPoint Fit(PixelPoint point)
+    {
+        PixelRect area = (Screens.ScreenFromPoint(point) ?? Screens.ScreenFromWindow(this) ?? Screens.Primary)?.WorkingArea ?? new PixelRect(0, 0, 1024, 768);
+        int width = (int)Math.Ceiling(Width * RenderScaling), height = (int)Math.Ceiling(Height * RenderScaling);
+        return new PixelPoint(Math.Clamp(point.X, area.X, Math.Max(area.X, area.Right - width)), Math.Clamp(point.Y, area.Y, Math.Max(area.Y, area.Bottom - height)));
+    }
+
+    private void Pressed(object sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
+        {
+            reply?.Hide();
+            ContextMenu = BuildMenu();
+            ContextMenu.Open(this);
+            e.Handled = true;
+            return;
+        }
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (e.ClickCount == 2) { Wake(); return; }
+        dragPointer = e.Pointer;
+        pointerOrigin = lastPointer = this.PointToScreen(e.GetPosition(this));
+        dragOrigin = Position;
+        lastMotion = clock.ElapsedMilliseconds;
+        gait.Reset();
+        e.Pointer.Capture(this);
+    }
+
+    private void Moved(object sender, PointerEventArgs e)
+    {
+        if (e.Pointer != dragPointer) return;
+        PixelPoint pointer = this.PointToScreen(e.GetPosition(this));
+        var delta = pointer - pointerOrigin;
+        if (!dragging && Math.Abs(delta.X) + Math.Abs(delta.Y) < 6) return;
+        var change = pointer - lastPointer;
+        if (change.X == 0 && change.Y == 0) return;
+        if (!dragging) { CancelMotion(); preferences.DockedEdge = ""; }
+        dragging = true;
+        Opacity = 1;
+        long now = clock.ElapsedMilliseconds;
+        gait.RecordMotion(Math.Sqrt((double)change.X * change.X + (double)change.Y * change.Y), now - lastMotion);
+        if (change.X != 0) left = change.X < 0;
+        lastPointer = pointer;
+        lastMotion = now;
+        Position = Fit(dragOrigin + delta);
+        RecordTrail();
+        AnchorConversation();
+    }
+
+    private void Released(object sender, PointerReleasedEventArgs e)
+    {
+        if (e.Pointer != dragPointer) return;
+        bool moved = dragging;
+        FinishDrag();
+        e.Pointer.Capture(null);
+        if (!moved) ShowLatestReply(Character.Quotes[Random.Shared.Next(Character.Quotes.Length)]);
+    }
+
+    private void FinishDrag()
+    {
+        dragPointer = null;
+        if (!dragging) return;
+        dragging = false;
+        gait.Reset();
+        var screen = Screens.ScreenFromWindow(this);
+        if (screen != null)
+        {
+            PixelRect work = screen.WorkingArea;
+            int width = (int)Math.Ceiling(Width * RenderScaling), height = (int)Math.Ceiling(Height * RenderScaling);
+            int xLeft = Math.Abs(Position.X - work.X), xRight = Math.Abs(work.Right - Position.X - width), bottom = Math.Abs(work.Bottom - Position.Y - height);
+            int nearest = Math.Min(bottom, Math.Min(xLeft, xRight));
+            if (nearest < 20) ApplyDock(nearest == bottom ? "bottom" : nearest == xLeft ? "left" : "right");
+        }
+        Save();
+    }
+
+    internal void OpenConversation()
+    {
+        reply?.Hide();
+        conversation ??= new ConversationWindow(this);
+        if (!conversation.IsVisible) { AnchorConversation(); conversation.Show(this); AnchorConversation(); }
+        conversation.Activate();
+    }
+
+    internal void HideCompanion()
+    {
+        reply?.Hide(); conversation?.Hide(); CancelMotion();
+        ContextMenu?.Close(); Hide();
+    }
+
+    internal void ShowCompanion()
+    {
+        if (IsClosing) return;
+        Position = Fit(Position);
+        if (!IsVisible) Show();
+        if (preferences.DockedEdge is "left" or "right" or "bottom") ApplyDock(preferences.DockedEdge);
+        Activate();
+    }
+
+    private void AnchorConversation()
+    {
+        if (conversation == null || positioning) return;
+        positioning = true;
+        try
+        {
+            PixelRect area = Screens.ScreenFromWindow(this)?.WorkingArea ?? new PixelRect(0, 0, 1024, 768);
+            double scale = RenderScaling;
+            int dialogWidth = (int)(conversation.Width * scale), dialogHeight = (int)(conversation.Height * scale);
+            int y = Position.Y + (int)(Height * scale) + 8;
+            if (!dragging && y + dialogHeight > area.Bottom)
+            {
+                y = Math.Max(area.Y + (int)(Height * scale), area.Bottom - dialogHeight);
+                Position = Fit(new PixelPoint(Position.X, y - (int)(Height * scale) - 8));
+            }
+            int x = Position.X + ((int)(Width * scale) - dialogWidth) / 2;
+            conversation.Position = new PixelPoint(Math.Clamp(x, area.X, Math.Max(area.X, area.Right - dialogWidth)), Math.Clamp(y, area.Y, Math.Max(area.Y, area.Bottom - dialogHeight)));
+        }
+        finally { positioning = false; }
+    }
+
+    internal void ConversationMoved(ConversationWindow window)
+    {
+        if (positioning || !window.IsVisible || IsClosing) return;
+        double scale = RenderScaling;
+        Position = Fit(new PixelPoint(window.Position.X + (int)((window.Width - Width) * scale / 2), window.Position.Y - (int)(Height * scale) - 8));
+    }
+
+    internal void ShowLatestReply(string text)
+    {
+        currentReply = text?.Trim();
+        if (!IsVisible || IsClosing || ContextMenu?.IsOpen == true) return;
+        if (conversation?.IsVisible == true || string.IsNullOrWhiteSpace(currentReply)) return;
+        if (reply == null)
+        {
+            replyLabel = DesktopUi.DataLabel("");
+            reply = DesktopUi.Dialog("Claude", DesktopUi.Stack(replyLabel, DesktopUi.Action("隐藏", () => reply.Hide())), 315, 112);
+            reply.MinHeight = 75; reply.MinWidth = 180;
+            DesktopUi.RemoveDecorations(reply);
+            reply.Topmost = true;
+            reply.ShowInTaskbar = false;
+            reply.WindowStartupLocation = WindowStartupLocation.Manual;
+            reply.PointerPressed += (_, e) => { if (e.ClickCount == 2) OpenConversation(); };
+        }
+        replyLabel.Text = currentReply.Length <= 130 ? currentReply : "…" + UiText.TailCodeUnits(currentReply, 130);
+        AnchorReply();
+        if (!reply.IsVisible) reply.Show(this);
+        AnchorReply();
+    }
+
+    private void AnchorReply()
+    {
+        if (reply == null) return;
+        var work = Screens.ScreenFromWindow(this)?.WorkingArea;
+        if (work == null) return;
+        int w = (int)(reply.Width * RenderScaling), h = (int)(reply.Height * RenderScaling);
+        int x = Position.X + ((int)(Width * RenderScaling) - w) / 2;
+        int y = Position.Y + (int)(Height * RenderScaling) + 5;
+        reply.Position = new PixelPoint(Math.Clamp(x, work.Value.X, Math.Max(work.Value.X, work.Value.Right - w)),
+            Math.Clamp(y, work.Value.Y, Math.Max(work.Value.Y, work.Value.Bottom - h)));
+    }
+
+    private void Dropped(object sender, DragEventArgs e)
+    {
+        string[] paths = e.DataTransfer.TryGetFiles()?.Select(file => file.TryGetLocalPath()).Where(path => File.Exists(path) || Directory.Exists(path)).ToArray();
+        if (paths == null || paths.Length == 0) return;
+        e.DragEffects = DragDropEffects.Copy;
+        Gesture("eating", 950);
+        DispatcherTimer.RunOnce(() =>
+        {
+            if (IsClosing) return;
+            Gesture("wiping-mouth", 850);
+            OpenConversation();
+            conversation.StageFiles(paths);
+        }, TimeSpan.FromMilliseconds(preferences.ReduceMotion ? 0 : 950));
+    }
+
+    private MenuItem Item(string label, Action action)
+    {
+        var item = new MenuItem { Header = label };
+        LinuxLanguageBindings.Caption(item);
+        item.Click += (_, _) =>
+        {
+            try { action(); }
+            catch (Exception error) { DesktopUi.Notice(this, "agent-pal", error.Message); }
+        };
+        return item;
+    }
+
+    private ContextMenu BuildMenu()
+    {
+        var characters = new MenuItem { Header = "切换形象" };
+        LinuxLanguageBindings.Caption(characters);
+        foreach (PetCharacter profile in PetCharacter.Available)
+            characters.Items.Add(Item(profile.Name, () => { LoadCharacter(profile); Save(); }));
+        characters.Items.Add(Item("打开角色资源目录", () => DesktopUi.OpenFolder(catalog.Root)));
+        characters.Items.Add(Item("刷新外置角色", () => Rescan()));
+        characters.Items.Add(Item("查看校验结果", () => DesktopUi.Notice(this, "角色资源校验", characterScan != null || pendingCharacterScan != null
+            ? UiLanguage.Text("资源校验正在后台运行，请稍候。") : characterScanErrors.Length == 0
+            ? UiLanguage.Text("未发现资源校验错误。") : string.Join("\n", characterScanErrors))));
+        var menu = new ContextMenu();
+        menu.Items.Add(Item("对话", OpenConversation));
+        menu.Items.Add(Item("打开 Claude Code CLI", () => LinuxTerminal.OpenClaude(DirectoryPath, Character.Id)));
+        menu.Items.Add(characters);
+        menu.Items.Add(Item("Claude Code 定时任务", () => TaskWindow.Show(this, services.Tasks)));
+        menu.Items.Add(Item("提醒与倒计时", () => ReminderWindows.ShowSettings(this, services.Reminders)));
+        menu.Items.Add(Item("事件规划 / 门派协作", () => WorkshopWindow.Show(this, services)));
+        menu.Items.Add(Item("默认设置", ShowSettings));
+        menu.Items.Add(Item("跑一会儿", StartRoam));
+        menu.Items.Add(Item("全屏漫游", StartTour));
+        menu.Items.Add(Item("历史上的今天", () => RequestBrain("history")));
+        menu.Items.Add(Item("隐藏宠物", HideCompanion));
+        menu.Items.Add(Item("退出agent-pal", Close));
+        return menu;
+    }
+
+    internal void ShowSettings()
+    {
+        var directory = new TextBox { Text = preferences.Directory, Watermark = "Claude 默认工作目录" };
+        var top = new CheckBox { Content = "保持置顶", IsChecked = Topmost };
+        var motion = new CheckBox { Content = "减少动画", IsChecked = preferences.ReduceMotion };
+        var startup = new CheckBox { Content = "开机自动启动", IsChecked = LinuxStartup.Enabled };
+        var size = new Slider { Minimum = 80, Maximum = 260, Value = Width };
+        var opacity = new Slider { Minimum = 20, Maximum = 100, Value = preferences.DockedOpacity * 100 };
+        var trailOpacity = new Slider { Minimum = 0, Maximum = 100, Value = preferences.TrailOpacity * 100 };
+        var paths = new ComboBox { ItemsSource = new[] { "Built-in random curves", "AI route pool (24 routes per request)" }, SelectedIndex = preferences.PathMode == "ai" ? 1 : 0 };
+        var care = new CheckBox { Content = "Allow proactive messages and break reminders", IsChecked = preferences.ProactiveCare };
+        var breakMinutes = new NumericUpDown { Minimum = 5, Maximum = 240, Value = preferences.BreakMinutes, Width = 120 };
+        var integration = IntegrationPreferences.Load();
+        var language = new ComboBox { ItemsSource = new[] { "English", "简体中文" }, SelectedIndex = UiLanguage.IsEnglish ? 0 : 1 };
+        var scope = new ComboBox { Name = "CompanionScope", ItemsSource = new[] { "全局默认" }.Concat(PetCharacter.Available.Select(p => p.Name)).ToArray(), SelectedIndex = 0 };
+        var configuration = new TextBox { Watermark = "继承全局 / CLI 自身配置", Text = integration.ClaudeSettingsPath };
+        var executable = new TextBox { Name = "ClaudeExecutable", Watermark = UiLanguage.Text("Leave empty to use the global executable or PATH"), Text = integration.ExecutableOverrideFor(null) };
+        var profiles = PetCharacter.Available;
+        Window dialog = null;
+        string editingScope = null;
+        var dirtyScopes = new HashSet<string>();
+        void StoreFields()
+        {
+            string key = editingScope ?? "";
+            if (integration.SettingsPathFor(editingScope) != configuration.Text || integration.ExecutableOverrideFor(editingScope) != executable.Text) dirtyScopes.Add(key);
+            integration.SetSettingsPath(editingScope, configuration.Text);
+            if (editingScope == null) integration.ClaudeExecutablePath = executable.Text;
+            else
+            {
+                integration.CharacterClaudeExecutables ??= new();
+                integration.CharacterClaudeExecutables[editingScope] = executable.Text;
+            }
+        }
+        scope.SelectionChanged += (_, _) =>
+        {
+            if (scope.SelectedIndex < 0) return;
+            StoreFields();
+            string id = scope.SelectedIndex <= 0 ? null : profiles[scope.SelectedIndex - 1].Id;
+            editingScope = id;
+            configuration.Text = integration.SettingsPathFor(id);
+            executable.Text = integration.ExecutableOverrideFor(id);
+        };
+        var browse = DesktopUi.Action("选择目录…", async () => { string folder = await DesktopUi.Folder(dialog, "Claude 默认目录"); if (folder != null) directory.Text = folder; });
+        var browseJson = DesktopUi.Action("选择 JSON…", async () => { string path = await DesktopUi.JsonFile(dialog, "Claude 配置文件"); if (path != null) configuration.Text = path; });
+        var browseExecutable = DesktopUi.Action("Browse…", async () => { string path = await DesktopUi.ExecutableFile(dialog); if (path != null) executable.Text = path; });
+        var apply = DesktopUi.Action("保存", () =>
+        {
+            try
+            {
+                if (!Directory.Exists(directory.Text)) throw new DirectoryNotFoundException("工作目录不存在。");
+                StoreFields();
+                foreach (string id in dirtyScopes)
+                {
+                    integration.SetSettingsPath(id, ClaudeSettingsFile.Validate(integration.SettingsPathFor(id)));
+                    integration.SetExecutablePath(id, integration.ExecutableOverrideFor(id));
+                }
+                if (startup.IsChecked == true != LinuxStartup.Enabled) LinuxStartup.SetEnabled(startup.IsChecked == true);
+                integration.Save();
+                preferences.Directory = Path.GetFullPath(directory.Text);
+                preferences.Topmost = Topmost = top.IsChecked == true;
+                preferences.ReduceMotion = motion.IsChecked == true;
+                preferences.DockedOpacity = opacity.Value / 100;
+                preferences.TrailOpacity = trailOpacity.Value / 100;
+                preferences.PathMode = paths.SelectedIndex == 1 ? "ai" : "builtin";
+                bool resetCare = preferences.ProactiveCare != (care.IsChecked == true) || preferences.BreakMinutes != (int)(breakMinutes.Value ?? 60);
+                preferences.ProactiveCare = care.IsChecked == true;
+                preferences.BreakMinutes = (int)(breakMinutes.Value ?? 60);
+                if (resetCare) { screenSession.Restart(); nextBreak = clock.ElapsedMilliseconds + preferences.BreakMinutes * 60000L; }
+                if (preferences.ReduceMotion) CancelMotion();
+                preferences.Size = (int)size.Value;
+                Width = preferences.Size; Height = Width * 416 / 384;
+                Position = Fit(Position);
+                if (preferences.DockedEdge is "left" or "right" or "bottom") ApplyDock(preferences.DockedEdge);
+                Save();
+                UiLanguage.Set(language.SelectedIndex == 1 ? "zh-CN" : "en");
+                dialog.Close();
+            }
+            catch (Exception error) { DesktopUi.Notice(dialog, "设置未保存", error.Message); }
+        });
+        dialog = DesktopUi.Dialog("默认设置", new ScrollViewer { Content = DesktopUi.Stack(DesktopUi.Label("Language"), language, DesktopUi.Label("Claude 默认工作目录"), directory, browse,
+            DesktopUi.Row(top, motion, startup), DesktopUi.Label("角色大小"), size, DesktopUi.Label("贴边不透明度"), opacity,
+            DesktopUi.Label("Companions"), scope, DesktopUi.Label("Claude executable"), executable, browseExecutable,
+            DesktopUi.Label("Claude 配置文件"), configuration, browseJson,
+            DesktopUi.Label("Roaming routes"), paths, care, DesktopUi.Label("Break reminder interval (minutes)"), breakMinutes,
+            DesktopUi.Label("Trail opacity"), trailOpacity,
+            DesktopUi.Label("AI routes and proactive messages use your configured Claude service and may incur usage."), apply) }, 590, 650);
+        dialog.Name = "DefaultSettingsWindow";
+        dialog.Show(this);
+    }
+}

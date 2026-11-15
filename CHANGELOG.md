@@ -2,6 +2,11 @@
 
 [简体中文](CHANGELOG.zh-CN.md)
 
+## 1.0.0 · agent-pal · 2026-11-15
+
+- Unify the application, installer, startup entry and repository under the agent-pal name.
+- Keep weekday scheduling for Claude Code tasks and reminders, and retain existing local settings on upgrade.
+
 ## Unreleased · Linux candidate
 
 - Native X11 desktop for x64 and ARM64, with a separate glibc 2.17 compatibility candidate.

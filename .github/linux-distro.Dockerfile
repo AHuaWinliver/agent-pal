@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
 # Build-only validation image. The application never installs these packages.
-ARG XIANPAL_IMAGE=debian@sha256:268fb24c39bca92d326dd83ea3abebe4a3f7751c804ffef23bb6d857dd343ff8
-FROM ${XIANPAL_IMAGE}
-ARG XIANPAL_FAMILY
+ARG AGENT_PAL_IMAGE=debian@sha256:268fb24c39bca92d326dd83ea3abebe4a3f7751c804ffef23bb6d857dd343ff8
+FROM ${AGENT_PAL_IMAGE}
+ARG AGENT_PAL_FAMILY
 RUN set -eu; \
-    case "$XIANPAL_FAMILY" in \
+    case "$AGENT_PAL_FAMILY" in \
       debian) \
         export DEBIAN_FRONTEND=noninteractive; \
         if grep -q 'VERSION_CODENAME=bullseye' /etc/os-release; then \
           printf 'deb http://archive.debian.org/debian bullseye main\ndeb http://archive.debian.org/debian-security bullseye-security main\n' > /etc/apt/sources.list; \
-          printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99xianpal-archive; \
+          printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99agent-pal-archive; \
         fi; \
         apt-get update; \
         apt-get install -y --no-install-recommends libicu-dev libssl-dev ca-certificates \
