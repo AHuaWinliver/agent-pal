@@ -8,8 +8,8 @@
 
 ## 程序入口
 
-src/DesktopTasks/XianPal 为应用（命名空间 XianPal），src/DesktopTasks/XianPal.Installer 为安装器（命名空间 XianPal.Installer）。
-程序使用 .NET Framework / WinForms；展示名为仙伴 · AI桌面伴侣。
+src/DesktopTasks/agent-pal 为应用（命名空间 agent-pal），src/DesktopTasks/AgentPal.Installer 为安装器（命名空间 AgentPal.Installer）。
+程序使用 .NET Framework / WinForms；展示名为agent-pal。
 既有设置、任务运行脚本、Hook、历史记录和安装器升级保持兼容。
 
 ## 原画与渲染
@@ -98,7 +98,7 @@ WalkingExpressionClock 使用独立时间与随机间隔，眨眼约0.19–0.26�
 ### 模块索引
 
 - PetForm / PetForm.Desktop：渲染、状态、桌面位置、可见性、输入。
-- PetCharacter / PetBrain：四位仙伴的口吻、台词、AI 提示词。
+- PetCharacter / PetBrain：四位agent-pal的口吻、台词、AI 提示词。
 - ClaudeCliRunner / NativeTaskHooks：CLI 调用、流式反馈与会话归属。
 - ClaudeTaskService / ClaudeTaskForm：调度、模式、编辑和历史。
 - BackgroundTaskSupervisor：原生后台创建、轮询与重启恢复。

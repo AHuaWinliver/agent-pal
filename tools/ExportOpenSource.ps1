@@ -4,10 +4,10 @@ $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
 & (Join-Path $PSScriptRoot 'TestRepository.ps1')
 . (Join-Path $PSScriptRoot 'PublicFiles.ps1')
-$program=Join-Path $projectRoot 'src/DesktopTasks/XianPal/Program.cs'
+$program=Join-Path $projectRoot 'src/DesktopTasks/AgentPal/Program.cs'
 $version=[regex]::Match([IO.File]::ReadAllText($program),'AssemblyFileVersion\("([0-9.]+)"\)').Groups[1].Value
 $version=([Version]$version).ToString(3)
-if(-not $Destination){$Destination=Join-Path $projectRoot ('dist/XianPal-'+$version+'-Source.zip')}
+if(-not $Destination){$Destination=Join-Path $projectRoot ('dist/agent-pal-'+$version+'-Source.zip')}
 $Destination=[IO.Path]::GetFullPath($Destination)
 if(Test-Path -LiteralPath $Destination){throw 'Destination exists; refusing to overwrite a prior source archive.'}
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Destination) | Out-Null
@@ -19,9 +19,9 @@ try {
     foreach($file in (Get-PublicProjectFiles $projectRoot | Sort-Object FullName -Unique)) {
         $relative=$file.FullName.Substring($projectRoot.Length+1).Replace('\','/')
         [void]$manifest.AppendLine((Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash+'  '+$relative)
-        [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive,$file.FullName,('XianPal-'+$version+'/'+$relative),[IO.Compression.CompressionLevel]::Optimal)
+        [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive,$file.FullName,('agent-pal-'+$version+'/'+$relative),[IO.Compression.CompressionLevel]::Optimal)
     }
-    $writer=[IO.StreamWriter]::new($archive.CreateEntry('XianPal-'+$version+'/SOURCE-SHA256SUMS.txt').Open(),[Text.UTF8Encoding]::new($false))
+    $writer=[IO.StreamWriter]::new($archive.CreateEntry('agent-pal-'+$version+'/SOURCE-SHA256SUMS.txt').Open(),[Text.UTF8Encoding]::new($false))
     try{$writer.Write($manifest.ToString())}finally{$writer.Dispose()}
 }finally{$archive.Dispose()}
 $hash=(Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash

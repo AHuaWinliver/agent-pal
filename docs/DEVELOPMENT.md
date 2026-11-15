@@ -6,7 +6,7 @@ For artwork, joint constraints and the full review checklist, start with [charac
 
 ## Application structure
 
-Windows uses C# and .NET Framework / WinForms in `src/DesktopTasks/XianPal`; the installer is in `XianPal.Installer`. Keep shared/Windows files compatible with the existing C# compiler. Linux has a separate Avalonia application in `XianPal.Linux`, linking compatible shared services with `XIANPAL_LINUX`.
+Windows uses C# and .NET Framework / WinForms in `src/DesktopTasks/agent-pal`; the installer is in `AgentPal.Installer`. Keep shared/Windows files compatible with the existing C# compiler. Linux has a separate Avalonia application in `AgentPal.Linux`, linking compatible shared services with `AGENT_PAL_LINUX`.
 
 | Module | Responsibility |
 | --- | --- |

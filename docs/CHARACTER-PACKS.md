@@ -2,16 +2,16 @@
 
 [简体中文](CHARACTER-PACKS.zh-CN.md)
 
-A compatible XianPal installation can load new companions from local resource files without recompiling or reinstalling. Packs are data-only: character metadata, complete PNG animation frames and SHA256 checksums. They cannot load assemblies, scripts or commands.
+A compatible agent-pal installation can load new companions from local resource files without recompiling or reinstalling. Packs are data-only: character metadata, complete PNG animation frames and SHA256 checksums. They cannot load assemblies, scripts or commands.
 
 ## Install or update a pack
 
 1. Right-click the companion and open the character resource directory.
 2. Copy the complete `<id>` folder into it. `character.json` must be directly inside that folder.
-3. Allow copying and validation to finish, then select the new external companion. Use refresh/validation results if it does not appear.
+3. Wait for the copy to finish, choose **Companions → Refresh character packs**, and select the newly listed custom companion.
 4. When updating, replace frame files first and the manifest last. Prefer preparing a complete pack in a dot-prefixed staging folder and moving it into place.
 
-Windows defaults to `%LOCALAPPDATA%\XianPal\Characters`; `XIANPAL_CHARACTER_DIR` can select another directory before launch. Linux uses the XDG data directory's `xianpal/Characters`. Paths must not contain symlinks or directory junctions. Packs live outside the installation and do not require administrator access.
+Windows defaults to `%LOCALAPPDATA%\agent-pal\Characters`; `AGENT_PAL_CHARACTER_DIR` can select another directory before launch. Linux uses the XDG data directory's `agent-pal/Characters`. Paths must not contain symlinks or directory junctions. Packs live outside the installation and do not require administrator access.
 
 Windows debounces changes before validation. The Linux port currently rescans periodically. An invalid update retains the already decoded character in memory; this is not a persistent backup. Invalid files will not load after restart. Keep a separate known-good pack. Removing the selected external pack falls back to Qingheng.
 

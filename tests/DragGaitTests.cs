@@ -5,7 +5,7 @@ using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 
 internal static class DragGaitTests
 {

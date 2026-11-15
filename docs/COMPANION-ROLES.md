@@ -2,7 +2,7 @@
 
 [简体中文](COMPANION-ROLES.zh-CN.md)
 
-The presets use explicit responsibilities, inputs, handoffs and evidence. They are XianPal workflows, not an endorsement or a guarantee of model performance. See the [workshop guide](WORKSHOP.md) for actual scheduling and permission boundaries.
+The presets use explicit responsibilities, inputs, handoffs and evidence. They are agent-pal workflows, not an endorsement or a guarantee of model performance. See the [workshop guide](WORKSHOP.md) for actual scheduling and permission boundaries.
 
 | Companion | Role | Deliverables | Boundary |
 | --- | --- | --- | --- |
@@ -23,8 +23,8 @@ Choose a project directory and fill in the shared goal, authorized scope, exclus
 
 ## Actual execution model
 
-XianPal currently schedules separate `claude -p` sessions in a dependency graph. It is not a native Agent Teams session with resident teammates or a shared mailbox. It does not enable experimental features or write native team runtime state.
+agent-pal currently schedules separate `claude -p` sessions in a dependency graph. It is not a native Agent Teams session with resident teammates or a shared mailbox. It does not enable experimental features or write native team runtime state.
 
 Role instructions are prompt conventions, not an operating-system sandbox. Existing CLI permissions still apply. A successful process exit means the process finished successfully; it does not prove review approval or test success. No hard human-approval gate based on the review text is implemented.
 
-`docs/templates/claude-agents/` contains optional native role definitions. Review and copy them manually into a chosen project's `.claude/agents/` if appropriate. They inherit the model. Their native tool lists apply only when Claude loads those files; they do not automatically constrain XianPal's current scheduler. Bash can write files and requires the usual permissions.
+`docs/templates/claude-agents/` contains optional native role definitions. Review and copy them manually into a chosen project's `.claude/agents/` if appropriate. They inherit the model. Their native tool lists apply only when Claude loads those files; they do not automatically constrain agent-pal's current scheduler. Bash can write files and requires the usual permissions.

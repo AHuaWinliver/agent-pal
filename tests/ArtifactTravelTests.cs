@@ -7,7 +7,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 
 internal static class ArtifactTravelTests
 {
@@ -117,7 +117,7 @@ internal static class ArtifactTravelTests
     {
         try
         {
-            Application.EnableVisualStyles();string output=Environment.GetEnvironmentVariable("FUFU_STATE_DIR");Directory.CreateDirectory(output);
+            Application.EnableVisualStyles();string output=Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR");Directory.CreateDirectory(output);
             Point start=new Point(-1400,60);Point[] closed={new Point(-200,60),start};
             Check(ArtifactTravelClock.RouteLength(start,closed)==2400,"length sums segments including return leg on a negative-coordinate monitor");
             Check(ArtifactTravelClock.RouteLength(start,new Point[0])==0,"empty route does not mount");

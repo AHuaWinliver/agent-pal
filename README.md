@@ -1,12 +1,12 @@
 <div align="center">
 
-# XianPal
+# agent-pal
 
 **An animated desktop companion for Claude Code.**
 
-[简体中文](README.zh-CN.md) · [Get started](#get-started) · [Features](#features) · [Create a companion](#custom-characters) · [Download](https://github.com/AHuaWinliver/xianpal-ai-companion/releases)
+[简体中文](README.zh-CN.md) · [Get started](#get-started) · [Features](#features) · [Create a companion](#custom-characters) · [Download](https://github.com/AHuaWinliver/agent-pal/releases)
 
-<img src="docs/images/hero.png" alt="XianPal's four original cultivation-inspired desktop companions" width="100%">
+<img src="docs/images/hero.png" alt="agent-pal's four original cultivation-inspired desktop companions" width="100%">
 
 </div>
 
@@ -14,7 +14,7 @@ Chat beside one of four animated companions, drop a file into a Claude Code conv
 
 ## Get started
 
-1. On Windows 10 or 11, download and run `XianPal-*-Setup.exe`. Verify the file against the published SHA256 checksum. To try the features in the current source tree, [build from source](#build-from-source). [GitHub Releases](https://github.com/AHuaWinliver/xianpal-ai-companion/releases)
+1. On Windows 10 or 11, download and run `agent-pal-*-Setup.exe`. Verify the file against the published SHA256 checksum. To try the features in the current source tree, [build from source](#build-from-source). [GitHub Releases](https://github.com/AHuaWinliver/agent-pal/releases)
 2. Before using AI features, make sure `claude` starts in your terminal and connects to the service you configured. Desktop interactions and local reminders work independently.
 3. Right-click the companion and open **Default settings (默认设置)** to choose a working directory and Claude configuration. Double-click a reply bubble to continue the conversation. Use the tray menu to hide or restore the companion.
 
@@ -25,7 +25,7 @@ Chat beside one of four animated companions, drop a file into a Claude Code conv
 
 Choose English or Simplified Chinese and an installation folder while previewing the original companion animations.
 
-![XianPal setup with language choice, destination and animated character preview](docs/images/installer.png)
+![agent-pal setup with language choice, destination and animated character preview](docs/images/installer.png)
 
 </details>
 
@@ -36,7 +36,7 @@ Choose English or Simplified Chinese and an installation folder while previewing
 
 Double-click a reply bubble to open the chat beneath your companion. Your messages appear on the right and replies on the left. You can select and copy text or drag the chat header to move the window and companion together. Drop a file or folder onto the companion, then confirm the request and working directory before sending it to Claude Code.
 
-![XianPal's left and right chat bubbles and reply field](docs/images/chat-bubbles.png)
+![agent-pal's left and right chat bubbles and reply field](docs/images/chat-bubbles.png)
 
 ### Scheduled tasks and run history
 
@@ -77,7 +77,7 @@ Each companion has its own animations and expressions. Steps follow the cursor's
 
 ![The four companions riding their artifacts in both directions](docs/images/artifact-travel.png)
 
-Set a daily reminder or countdown. Daily reminders can play a character-specific performance or show a popup. Countdowns use a popup. Below is Qingheng's sword flight, which you can dismiss with **Esc**. [Performance guide](docs/REMINDER-PERFORMANCES.md)
+Set a daily or weekly reminder, or start a countdown. Scheduled reminders can play a character-specific performance or show a popup. Countdowns use a popup. Below is Qingheng's sword flight, which you can dismiss with **Esc**. [Performance guide](docs/REMINDER-PERFORMANCES.md)
 
 <img src="docs/images/sword-flight.gif" alt="Qingheng summons and rides a flying sword with a translucent wake" width="640">
 
@@ -86,7 +86,27 @@ Set a daily reminder or countdown. Daily reminders can play a character-specific
 
 <img src="docs/images/characters.png" alt="Character art for Qingheng, Feijian, Cangzhi and Xiaomo the charcoal turtle" width="100%">
 
-Right-click the companion, open the character menu and select **Open character resource folder (打开角色资源目录)**. Copy a complete character pack into the folder. XianPal validates and loads character packs while it runs.
+Import a custom pet as a self-contained folder. The app loads its animation, name, personality and reminder style while it runs.
+
+1. Right-click the pet and choose **Companions → Open character pack folder**. On a fresh Windows install, this opens `%LOCALAPPDATA%\agent-pal\Characters`. The menu always opens the active folder, including a folder retained from an earlier version.
+2. Copy the whole exported folder, for example `moon-keeper`, into `Characters`. Place `character.json` directly under `moon-keeper`, alongside the animation folders.
+3. Choose **Companions → Refresh character packs**. The result lists the imported pet by name and reports which packs need attention. Reopen **Companions** and select **Moon Keeper (custom)**.
+
+![The Companions menu showing the imported Moon Keeper and the Open character pack folder and Refresh character packs actions](docs/images/character-pack-menu-en.png)
+
+```text
+Characters/
+└── moon-keeper/
+    ├── character.json
+    ├── idle/
+    ├── running-left/
+    ├── running-right/
+    └── … other animation folders
+```
+
+Use the [pack guide](docs/CHARACTER-PACKS.md) for the full folder layout and the checksum manifest. To update a pet in place, keep its ID and replace the pack with a complete new export. An invalid update leaves the currently loaded frames visible and reports the validation error.
+
+### Author a pack
 
 1. Use the [character specification](docs/templates/CHARACTER-SPEC.md) and [profile template](docs/templates/character-profile.json) to define the look, personality, quotes, art sources and reminder style.
 2. Draw transparent frames and check both walking directions, joint connections, expressions and clipping. Use opposite arm and leg motion for bipeds and diagonal alternation for quadrupeds. External characters use their own frames with built-in performance timelines.
@@ -100,7 +120,7 @@ You need Windows 10 or 11, PowerShell and the system .NET Framework 4.x compiler
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
-.\build\payload\OrbitPet.exe
+.\build\payload\agent-pal.exe
 ```
 
 Find the installer in `dist/` and offline animation and performance previews in `build/previews/`. Pass `-SkipInstaller` to build the app and previews only. [Development and testing guide](docs/DEVELOPMENT.md)
@@ -113,7 +133,7 @@ The Linux desktop application is under development on the `linux` branch for x86
 
 ## Contributing
 
-Original characters, animation tools, desktop fixes, tests and translations are welcome. Discuss changes in [Issues](https://github.com/AHuaWinliver/xianpal-ai-companion/issues) and follow the [contribution guide](CONTRIBUTING.md). Major features include images and instructions in both READMEs.
+Original characters, animation tools, desktop fixes, tests and translations are welcome. Discuss changes in [Issues](https://github.com/AHuaWinliver/agent-pal/issues) and follow the [contribution guide](CONTRIBUTING.md). Major features include images and instructions in both READMEs.
 
 ## Privacy and license
 

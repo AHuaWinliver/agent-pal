@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 
 internal static class ClaudeBackgroundTests
 {
@@ -25,13 +25,13 @@ internal static class ClaudeBackgroundTests
     [STAThread]
     private static int Main(string[] args)
     {
-        root = Environment.GetEnvironmentVariable("FUFU_BG_TEST_ROOT");
+        root = Environment.GetEnvironmentVariable("AGENT_PAL_BG_TEST_ROOT");
         if (args.Length > 0) return Mock(args);
         root = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "claude-background-test", Guid.NewGuid().ToString("N")));
         Directory.CreateDirectory(root);
-        Environment.SetEnvironmentVariable("FUFU_TEST_MODE", "1");
-        Environment.SetEnvironmentVariable("FUFU_BG_TEST_ROOT", root);
-        Environment.SetEnvironmentVariable("FUFU_STATE_DIR", root);
+        Environment.SetEnvironmentVariable("AGENT_PAL_TEST_MODE", "1");
+        Environment.SetEnvironmentVariable("AGENT_PAL_BG_TEST_ROOT", root);
+        Environment.SetEnvironmentVariable("AGENT_PAL_STATE_DIR", root);
         try
         {
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
@@ -102,10 +102,10 @@ internal static class ClaudeBackgroundTests
                     Require(Until(delegate { return parallel.Status == "failed"; }, 10000), "failed native job reports failure without stopping another run");
                     File.WriteAllText(file + ".stop-worker", "done");
                 }
-                Environment.SetEnvironmentVariable("FUFU_BG_UNSUPPORTED", "1");
+                Environment.SetEnvironmentVariable("AGENT_PAL_BG_UNSUPPORTED", "1");
                 Call(pet, "QueueScheduledClaudeTask", task); ClaudeTaskRunRecord unsupported = task.History[0];
                 Require(Until(delegate { return unsupported.Status == "failed"; }, 10000), "unsupported CLI fails clearly instead of falling back to -p");
-                Environment.SetEnvironmentVariable("FUFU_BG_UNSUPPORTED", null);
+                Environment.SetEnvironmentVariable("AGENT_PAL_BG_UNSUPPORTED", null);
                 task.OverlapMode = "block";
                 Call(pet, "QueueScheduledClaudeTask", task); ClaudeTaskRunRecord surviving = task.History[0];
                 Require(Until(delegate { return !String.IsNullOrEmpty(surviving.BackgroundJobId); }, 18000), "job accepted before pet shutdown");
@@ -136,7 +136,7 @@ internal static class ClaudeBackgroundTests
 
     private static int Mock(string[] args)
     {
-        if (Environment.GetEnvironmentVariable("FUFU_TEST_MODE") != "1" || String.IsNullOrEmpty(root)) return 99;
+        if (Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") != "1" || String.IsNullOrEmpty(root)) return 99;
         Console.OutputEncoding = new UTF8Encoding(false);
         // Global CLI options may precede agents/logs. Keep fixture dispatch
         // independent of the application's argument ordering.
@@ -145,17 +145,17 @@ internal static class ClaudeBackgroundTests
         {
             args = new List<string>(args).GetRange(2, args.Length - 2).ToArray();
         }
-        if (args[0] == "--help") { Console.WriteLine(Environment.GetEnvironmentVariable("FUFU_BG_UNSUPPORTED") == "1" ? "legacy CLI" : "--bg --background"); return 0; }
+        if (args[0] == "--help") { Console.WriteLine(Environment.GetEnvironmentVariable("AGENT_PAL_BG_UNSUPPORTED") == "1" ? "legacy CLI" : "--bg --background"); return 0; }
         if (args[0] == "agents" && Array.IndexOf(args, "--help") >= 0) { Console.WriteLine("--json --all"); return 0; }
         if (args[0] == "agents")
         {
             List<object> rows = new List<object> { new { id = "deadbeef", kind = "background", name = "other-user-job", state = "working", cwd = "C:/unrelated" } };
-            foreach (string file in Directory.GetFiles(root, "OrbitBg-*.json")) rows.Add(Read(file));
+            foreach (string file in Directory.GetFiles(root, "agent-pal-bg-*.json")) rows.Add(Read(file));
             Console.WriteLine(json.Serialize(rows)); return 0;
         }
         if (args[0] == "logs")
         {
-            foreach (string file in Directory.GetFiles(root, "OrbitBg-*.json"))
+            foreach (string file in Directory.GetFiles(root, "agent-pal-bg-*.json"))
                 if ((string)Read(file)["id"] == args[1]) { Console.WriteLine(File.Exists(file + ".logs") ? File.ReadAllText(file + ".logs") : "正在执行中文后台任务 ✅"); return 0; }
             return 1;
         }
@@ -173,7 +173,7 @@ internal static class ClaudeBackgroundTests
             if (Array.IndexOf(args, "-p") >= 0 || String.IsNullOrEmpty(name)) return 2;
             Dictionary<string, object> config = Read(settings);
             Dictionary<string, object> env = (Dictionary<string, object>)config["env"];
-            Write(Path.Combine(root, name + ".capture"), new { cwd = Environment.CurrentDirectory, redirected = Console.IsOutputRedirected, inputRedirected = Console.IsInputRedirected, taskId = env["FUFU_PET_INTERNAL_TASK_ID"], model = config["model"], customEnv = env["TEST_SETTING"], prompt = args[args.Length - 1] });
+            Write(Path.Combine(root, name + ".capture"), new { cwd = Environment.CurrentDirectory, redirected = Console.IsOutputRedirected, inputRedirected = Console.IsInputRedirected, taskId = env["AGENT_PAL_PET_INTERNAL_TASK_ID"], model = config["model"], customEnv = env["TEST_SETTING"], prompt = args[args.Length - 1] });
             Write(file, new { id = Guid.NewGuid().ToString("N").Substring(0, 8), kind = "background", name = name, state = "working", status = "busy", cwd = Environment.CurrentDirectory, sessionId = Guid.NewGuid().ToString("D") });
             Process.Start(new ProcessStartInfo(Assembly.GetExecutingAssembly().Location, "--mock-worker " + name) { UseShellExecute = false, CreateNoWindow = true });
             Console.WriteLine("backgrounded · " + (string)Read(file)["id"] + " · " + name); return 0;

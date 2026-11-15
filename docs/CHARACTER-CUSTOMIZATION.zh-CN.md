@@ -2,7 +2,7 @@
 
 # 人物定制与动画制作规范
 
-本指南对应仙伴公开版 **0.6.7** 的实际实现，供美术、动画与开发贡献者共同使用。范围包括人物创建、分层素材、动作编辑、步态、表情和全屏演绎；不是通用 3D 建模教程，也不代表已经提供可直接导入任意角色的皮肤编辑器。
+本指南对应agent-pal公开版 **0.6.7** 的实际实现，供美术、动画与开发贡献者共同使用。范围包括人物创建、分层素材、动作编辑、步态、表情和全屏演绎；不是通用 3D 建模教程，也不代表已经提供可直接导入任意角色的皮肤编辑器。
 
 **核心原则：保留确认后的造型，只改变关节姿态；先预览确认，再导出人物包。** 只有修改程序能力时才需要重新构建安装包。不要以修复动作的名义重新生成角色的头型、五官、服装或比例。模板见 [人物定制规格单](templates/CHARACTER-SPEC.zh-CN.md)，底层说明见 [开发与动画](DEVELOPMENT.zh-CN.md)。
 
@@ -65,14 +65,14 @@
 | [art/rigs/regions.json](../art/rigs/regions.json) 与同目录 PNG | 站立/交互的透明部件图及实际像素裁区 |
 | [art/side-rigs/regions.json](../art/side-rigs/regions.json) 与同目录 PNG | 侧向行走部件；不能只改头而保留正面身体 |
 | [art/side-torsos/regions.json](../art/side-torsos/regions.json) 与同目录 PNG | 三个人体行走时单独修正的躯干；当前灵龟不走此替换分支 |
-| [PetCharacter.cs](../src/DesktopTasks/XianPal/PetCharacter.cs) | ID、名字、Persona、Quotes、提醒样式及归一化嘴部参数 |
+| [PetCharacter.cs](../src/DesktopTasks/AgentPal/PetCharacter.cs) | ID、名字、Persona、Quotes、提醒样式及归一化嘴部参数 |
 | [BuildOriginalCharacters.cs](../tools/BuildOriginalCharacters.cs) | 原画导入、裁区、Rig、靴子、网格、各状态与表情贴片生成 |
-| [CompanionMotion.cs](../src/DesktopTasks/XianPal/CompanionMotion.cs) | 共享颈根、肩口、髋点、肘部、手掌目标与四足曲线 |
-| [PetForm.cs](../src/DesktopTasks/XianPal/PetForm.cs) | 资源加载、位移与播放节奏、方向、输入和状态切换 |
-| [PetForm.Expressions.cs](../src/DesktopTasks/XianPal/PetForm.Expressions.cs) | 运行时局部表情合成；与动作帧共享头部变换 |
-| [ReminderPerformance.cs](../src/DesktopTasks/XianPal/ReminderPerformance.cs) | 全屏演出唯一时间线、角色姿态和场景绘制 |
-| [ReminderPerformanceSurface.cs](../src/DesktopTasks/XianPal/ReminderPerformanceSurface.cs) | 每像素透明画布与原生资源生命周期 |
-| [ReminderOverlayForm.cs](../src/DesktopTasks/XianPal/ReminderOverlayForm.cs) | 演出与提醒卡片、减少动态、退出及降级 |
+| [CompanionMotion.cs](../src/DesktopTasks/AgentPal/CompanionMotion.cs) | 共享颈根、肩口、髋点、肘部、手掌目标与四足曲线 |
+| [PetForm.cs](../src/DesktopTasks/AgentPal/PetForm.cs) | 资源加载、位移与播放节奏、方向、输入和状态切换 |
+| [PetForm.Expressions.cs](../src/DesktopTasks/AgentPal/PetForm.Expressions.cs) | 运行时局部表情合成；与动作帧共享头部变换 |
+| [ReminderPerformance.cs](../src/DesktopTasks/AgentPal/ReminderPerformance.cs) | 全屏演出唯一时间线、角色姿态和场景绘制 |
+| [ReminderPerformanceSurface.cs](../src/DesktopTasks/AgentPal/ReminderPerformanceSurface.cs) | 每像素透明画布与原生资源生命周期 |
+| [ReminderOverlayForm.cs](../src/DesktopTasks/AgentPal/ReminderOverlayForm.cs) | 演出与提醒卡片、减少动态、退出及降级 |
 | [WalkingPreview.js](../tools/WalkingPreview.js) / [BuildReminderPreviews.cs](../tools/BuildReminderPreviews.cs) | 动作浏览与原生演出导出的离线预览 |
 
 ### 裁区结构：不是九宫格
@@ -216,7 +216,7 @@
 
 ## 9. 预览、测试与提交
 
-在项目根目录运行，建议源码放在短路径（例如 `C:\src\xianpal`）。修改输入原画/代码后必须重新生成，不能只刷新旧预览。构建会替换已知生成目录 `build/payload`，不要在其中保存唯一一份手工素材。
+在项目根目录运行，建议源码放在短路径（例如 `C:\src\agent-pal`）。修改输入原画/代码后必须重新生成，不能只刷新旧预览。构建会替换已知生成目录 `build/payload`，不要在其中保存唯一一份手工素材。
 
 ```powershell
 # 生成素材与程序，不制作安装器；不调用 Claude 或图片生成服务

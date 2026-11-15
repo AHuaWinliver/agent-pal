@@ -15,13 +15,13 @@ internal static class InstallerConfigurationTests
         try
         {
             Application.EnableVisualStyles();
-            if (Environment.GetEnvironmentVariable("FUFU_TEST_MODE") != "1") throw new Exception("Test isolation required.");
+            if (Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") != "1") throw new Exception("Test isolation required.");
             var assembly = Assembly.LoadFrom(Path.GetFullPath(args[0]));
-            var program = assembly.GetType("XianPal.Installer.Program", true);
+            var program = assembly.GetType("AgentPal.Installer.Program", true);
             var select = program.GetMethod("SelectInstallDirectory", BindingFlags.Static | BindingFlags.NonPublic);
             var location = program.GetField("InstallDirectory", BindingFlags.Static | BindingFlags.NonPublic);
-            string root = Environment.GetEnvironmentVariable("FUFU_STATE_DIR");
-            string custom = Path.Combine(root, "仙伴 custom folder");
+            string root = Environment.GetEnvironmentVariable("AGENT_PAL_STATE_DIR");
+            string custom = Path.Combine(root, "agent-pal custom folder");
             select.Invoke(null, new object[] { custom });
             Check((string)location.GetValue(null) == custom, "custom Unicode installation directory is selected");
             string unrelated = Path.Combine(root, "unrelated"); Directory.CreateDirectory(unrelated);
@@ -33,9 +33,9 @@ internal static class InstallerConfigurationTests
                 catch (TargetInvocationException error) { rejected = error.InnerException is InvalidOperationException; }
                 Check(rejected && (string)location.GetValue(null) == custom && File.ReadAllText(userFile) == "keep", "invalid installation folder is rejected without changing the previous selection or user files");
             }
-            var locale = assembly.GetType("XianPal.UiLanguage", true).GetMethod("Set", BindingFlags.Static | BindingFlags.NonPublic);
+            var locale = assembly.GetType("AgentPal.UiLanguage", true).GetMethod("Set", BindingFlags.Static | BindingFlags.NonPublic);
             locale.Invoke(null, new object[] { "en" });
-            using (var window = (Form)Activator.CreateInstance(assembly.GetType("XianPal.Installer.InstallerForm", true), true))
+            using (var window = (Form)Activator.CreateInstance(assembly.GetType("AgentPal.Installer.InstallerForm", true), true))
             {
                 var destination = window.Controls.Find("InstallDirectory", true)[0] as TextBox;
                 Check(destination != null && destination.Text == custom, "installer shows an editable custom destination");
@@ -46,7 +46,7 @@ internal static class InstallerConfigurationTests
                 foreach (Array clip in clips) Check(clip.Length == 24, "preview uses the complete 24-frame original artwork sequence");
                 window.Location = new Point(SystemInformation.VirtualScreen.Right + 100, 0);
                 // Use a public illustrative path in screenshot evidence.
-                destination.Text = @"C:\Apps\XianPal";
+                destination.Text = @"C:\Apps\agent-pal";
                 window.Show(); Application.DoEvents();
                 using (var capture = new Bitmap(window.Width, window.Height))
                 { window.DrawToBitmap(capture, new Rectangle(Point.Empty, capture.Size)); capture.Save(Path.Combine(root, "installer-en.png")); }

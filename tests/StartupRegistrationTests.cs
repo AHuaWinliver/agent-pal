@@ -4,7 +4,7 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using XianPal;
+using AgentPal;
 
 internal static class StartupRegistrationTests
 {
@@ -20,11 +20,11 @@ internal static class StartupRegistrationTests
             "Task Manager file description is not the software name");
         Assembly assembly = Assembly.LoadFrom(path);
         Require(assembly.GetName().Version.ToString() == version + ".0", "Assembly version disagrees with VERSION");
-        Type program = assembly.GetType(installer ? "XianPal.Installer.Program" : "XianPal.Program", true);
+        Type program = assembly.GetType(installer ? "AgentPal.Installer.Program" : "AgentPal.Program", true);
         string field = installer ? "AppName" : "ProductName";
         Require((string)program.GetField(field, BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue() == StartupRegistration.DisplayName,
             "Window and startup product names differ");
-        Require(assembly.GetType("XianPal.StartupRegistration", false) != null, "Shared startup implementation absent");
+        Require(assembly.GetType("AgentPal.StartupRegistration", false) != null, "Shared startup implementation absent");
         if (installer) Require((string)program.GetField("Version", BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue() == version,
             "Installer display version disagrees with VERSION");
     }
@@ -32,7 +32,7 @@ internal static class StartupRegistrationTests
     private static void TestRegistry(RegistryKey root)
     {
         string name = StartupRegistration.DisplayName, legacy = StartupRegistration.LegacyName;
-        string command = "\"C:\\Applications\\仙伴 测试\\OrbitPet.exe\" --existing-argument";
+        string command = "\"C:\\Applications\\agent-pal 测试\\agent-pal.exe\" --existing-argument";
         byte[] disabled = { 3, 0, 0, 0, 10, 20, 30, 40, 50, 60, 70, 80 };
         byte[] enabled = { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
         using (RegistryKey run = root.CreateSubKey("Run"))
@@ -55,7 +55,7 @@ internal static class StartupRegistrationTests
                 StartupRegistration.SetEnabled(run, approval, false, null);
             }
 
-            string expandable = "\"%LOCALAPPDATA%\\OrbitPet\\OrbitPet.exe\"";
+            string expandable = "\"%LOCALAPPDATA%\\agent-pal\\agent-pal.exe\"";
             run.SetValue(legacy, expandable, RegistryValueKind.ExpandString);
             StartupRegistration.MigrateLegacy(run, null);
             Require(run.GetValueKind(name) == RegistryValueKind.ExpandString &&
@@ -74,7 +74,7 @@ internal static class StartupRegistrationTests
             StartupRegistration.SetEnabled(run, approval, false, null);
             run.SetValue(legacy, command);
             approval.SetValue(legacy, disabled, RegistryValueKind.Binary);
-            string executable = "C:\\Applications\\仙伴 测试\\OrbitPet.exe";
+            string executable = "C:\\Applications\\agent-pal 测试\\agent-pal.exe";
             StartupRegistration.SetEnabled(run, approval, true, executable);
             Require((string)run.GetValue(name) == "\"" + executable + "\"" && run.GetValue(legacy) == null,
                 "Enabling failed to use the new name and quoted executable");
@@ -92,7 +92,7 @@ internal static class StartupRegistrationTests
     private static int Main(string[] args)
     {
         // Never test against the actual Windows Run / StartupApproved keys.
-        string testKey = "Software\\XianPal\\Tests\\StartupRegistration\\" + Guid.NewGuid().ToString("N");
+        string testKey = "Software\\agent-pal\\Tests\\StartupRegistration\\" + Guid.NewGuid().ToString("N");
         try
         {
             Require(args.Length == 3, "Compiled app and installer paths plus public version required");

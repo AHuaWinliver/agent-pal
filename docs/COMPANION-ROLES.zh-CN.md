@@ -2,7 +2,7 @@
 
 # 四道友角色预设 · 0.6.7
 
-参考 Claude Code 官方 [Agent Teams最佳实践](https://code.claude.com/docs/en/agent-teams#best-practices) 与 [可复用subagent定义](https://code.claude.com/docs/en/sub-agents)，按职责互补、明确输入/交付物、避免文件冲突、独立审查和负责人汇总设计。这里是仙伴的应用设计，不是官方认可或模型能力保证。
+参考 Claude Code 官方 [Agent Teams最佳实践](https://code.claude.com/docs/en/agent-teams#best-practices) 与 [可复用subagent定义](https://code.claude.com/docs/en/sub-agents)，按职责互补、明确输入/交付物、避免文件冲突、独立审查和负责人汇总设计。这里是agent-pal的应用设计，不是官方认可或模型能力保证。
 
 | 道友 | 门派职司 | 核心能力与交付 | 职责边界 |
 | --- | --- | --- | --- |
@@ -30,18 +30,18 @@
 
 ## 权限与验收的真实边界
 
-这些是**提示词职责约定**，并不是操作系统只读沙箱。仙伴沿用本机CLI权限，不自动授予工具权限，不使用绕过授权参数，不自动创建worktree。恶意或错误的模型行为不能只靠角色提示词防范；重要项目需设置CLI工具限制及隔离目录。小墨的测试/Bash本身可能写入文件，必须先检查脚本。
+这些是**提示词职责约定**，并不是操作系统只读沙箱。agent-pal沿用本机CLI权限，不自动授予工具权限，不使用绕过授权参数，不自动创建worktree。恶意或错误的模型行为不能只靠角色提示词防范；重要项目需设置CLI工具限制及隔离目录。小墨的测试/Bash本身可能写入文件，必须先检查脚本。
 
 当前调度的success表示CLI进程成功退出，不等于审查通过。若审查发现问题或测试未运行，青衡应明确报告需修正/未验证；**尚未实现基于审查结论的强制人工审批门禁**，不要把角色建议当作发布批准。
 
-当前仙伴使用 `claude -p` 独立会话和DAG调度，**不是真正原生Agent Teams**。官方文档说明原生teammate需要交互式会话，`-p` 下不会生成teammate；本次不会启用实验开关、修改用户Claude配置、预写`~/.claude/teams`运行时目录或声称拥有原生消息邮箱。会话中的模型、工具、MCP、网络能力以你的CLI实际配置和许可为准。
+当前agent-pal使用 `claude -p` 独立会话和DAG调度，**不是真正原生Agent Teams**。官方文档说明原生teammate需要交互式会话，`-p` 下不会生成teammate；本次不会启用实验开关、修改用户Claude配置、预写`~/.claude/teams`运行时目录或声称拥有原生消息邮箱。会话中的模型、工具、MCP、网络能力以你的CLI实际配置和许可为准。
 
 ## 可选原生Claude角色文件
 
-“掌门”是仙伴中的应用职司，不会把某个角色自动提升为原生Claude的team lead；原生团队负责人仍是启动团队的主会话。仙伴当前每一步也仍是新的CLI会话，不是四个常驻、共享记忆的原生teammate。
+“掌门”是agent-pal中的应用职司，不会把某个角色自动提升为原生Claude的team lead；原生团队负责人仍是启动团队的主会话。agent-pal当前每一步也仍是新的CLI会话，不是四个常驻、共享记忆的原生teammate。
 
 `docs/templates/claude-agents/` 提供四份可复用定义。需要在原生Claude中使用时，人工检查并复制到目标项目的 `.claude/agents/`，不要复制到用户全局目录或team运行时配置。模板使用 `model: inherit`，不强制更换你的内网模型。
 
-青衡/苍芷仅列Read/Grep/Glob；绯笺列Read/Grep/Glob/Edit/Write/Bash；小墨列Read/Grep/Glob/Bash。Bash不是只读工具，因此小墨仍须遵守CLI授权和隔离要求。这些工具列表只在**原生Claude加载这些定义时**生效，不会自动套用到仙伴现有CLI调度器。
+青衡/苍芷仅列Read/Grep/Glob；绯笺列Read/Grep/Glob/Edit/Write/Bash；小墨列Read/Grep/Glob/Bash。Bash不是只读工具，因此小墨仍须遵守CLI授权和隔离要求。这些工具列表只在**原生Claude加载这些定义时**生效，不会自动套用到agent-pal现有CLI调度器。
 
-原生teammate的启用、版本兼容与终端限制请查官方文档；本次不自动启用或运行。角色定义的修改也不会覆盖已保存的仙伴成员自定义职责。
+原生teammate的启用、版本兼容与终端限制请查官方文档；本次不自动启用或运行。角色定义的修改也不会覆盖已保存的agent-pal成员自定义职责。

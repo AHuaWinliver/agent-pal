@@ -1,12 +1,12 @@
 <div align="center">
 
-# 仙伴 XianPal
+# agent-pal agent-pal
 
 **连接本机 Claude Code 的 Windows AI 桌面伴侣。**
 
-[English](README.md) · [快速开始](#quick-start) · [功能](#features) · [定制角色](#custom-characters) · [下载](https://github.com/AHuaWinliver/xianpal-ai-companion/releases)
+[English](README.md) · [快速开始](#quick-start) · [功能](#features) · [定制角色](#custom-characters) · [下载](https://github.com/AHuaWinliver/agent-pal/releases)
 
-<img src="docs/images/hero.png" alt="仙伴的四位原创国风 Q 版桌面伙伴" width="100%">
+<img src="docs/images/hero.png" alt="agent-pal的四位原创国风 Q 版桌面伙伴" width="100%">
 
 </div>
 
@@ -15,7 +15,7 @@
 <a id="quick-start"></a>
 ## 快速开始
 
-1. 在 Windows 10 / 11 上下载并运行 `XianPal-*-Setup.exe`，按发布页提供的 SHA256 核对文件。需要仓库中的最新功能时，可以[从源码构建](#build)。[GitHub Releases](https://github.com/AHuaWinliver/xianpal-ai-companion/releases)
+1. 在 Windows 10 / 11 上下载并运行 `agent-pal-*-Setup.exe`，按发布页提供的 SHA256 核对文件。需要仓库中的最新功能时，可以[从源码构建](#build)。[GitHub Releases](https://github.com/AHuaWinliver/agent-pal/releases)
 2. 使用 AI 功能前，先在终端确认本机 `claude` 能启动并连接你配置的服务。桌面互动与本地提醒可独立使用。
 3. 右键宠物，从 **默认设置** 选择工作目录和 Claude 配置。双击回复气泡可继续对话，右键托盘图标可隐藏或找回宠物。
 
@@ -39,7 +39,7 @@
 
 双击回复气泡，在角色下方打开对话。你的消息靠右，道友回复靠左，正文可选择和复制。拖动对话标题可让窗口和角色一起移动。把文件或文件夹拖给宠物，确认需求与工作目录后再发送给 Claude Code。
 
-![仙伴的左右对话气泡与回复输入框](docs/images/chat-bubbles.png)
+![agent-pal的左右对话气泡与回复输入框](docs/images/chat-bubbles.png)
 
 ### 定时任务与运行记录
 
@@ -80,7 +80,7 @@
 
 ![四位道友各自的灵器和双向飞行姿态](docs/images/artifact-travel.png)
 
-设置每日提醒或倒计时。每日提醒可选角色专属演出或提示框，倒计时以提示框报时。下图是青衡的御剑演绎，可按 **Esc** 退出。[全屏演绎说明](docs/REMINDER-PERFORMANCES.zh-CN.md)
+设置每日或每周提醒，也可开启倒计时。定时提醒可选角色专属演出或提示框，倒计时以提示框报时。下图是青衡的御剑演绎，可按 **Esc** 退出。[全屏演绎说明](docs/REMINDER-PERFORMANCES.zh-CN.md)
 
 <img src="docs/images/sword-flight.gif" alt="青衡召剑、御剑飞行并回落，沿途留下半透明剑光" width="640">
 
@@ -89,7 +89,27 @@
 
 <img src="docs/images/characters.png" alt="青衡、绯笺、苍芷与墨黑灵龟小墨的角色素材" width="100%">
 
-右键选择 **切换形象 → 打开角色资源目录**，复制完整的角色包。仙伴会校验资源并自动加载，适合在安装后添加或更新角色。
+每个自定义宠物是一个独立的资源文件夹，包含动作、人设、台词和演出风格，可在程序运行中导入。
+
+1. 右键宠物，选择 **切换形象 → 打开角色资源目录**。Windows 新安装默认使用 `%LOCALAPPDATA%\agent-pal\Characters`。菜单会打开实际使用的目录，也适用于从旧版升级的用户。
+2. 将完整角色文件夹（例如 `moon-keeper`）复制进 `Characters`。`character.json` 应直接位于该文件夹中，与动作文件夹同级。
+3. 选择 **切换形象 → 刷新角色资源**。结果窗口会列出已导入的角色和有问题的包。重新打开「切换形象」，选择带「外置」标记的新角色。
+
+![实测菜单：已导入 Moon Keeper，菜单含打开角色资源目录及刷新角色资源](docs/images/character-pack-menu-zh-CN.png)
+
+```text
+Characters/
+└── moon-keeper/
+    ├── character.json
+    ├── idle/
+    ├── running-left/
+    ├── running-right/
+    └── … 其余动作文件夹
+```
+
+完整的动作目录和校验清单见[资源包教程](docs/CHARACTER-PACKS.zh-CN.md)。更新已有角色时沿用相同 ID，并替换为完整的新包。校验失败会保留当前已加载的形象，并在刷新结果里显示原因。
+
+### 制作角色包
 
 1. 复制[人物定制规格单](docs/templates/CHARACTER-SPEC.zh-CN.md)和[角色配置模板](docs/templates/character-profile.json)，定义造型、人设、台词、素材来源和提醒风格。
 2. 绘制透明动作帧，检查双向步态、关节连接、表情和画面边缘。双足动作采用对侧手脚，四足动作采用对角交替。外置角色使用自己的动作帧与内置演绎时间线。
@@ -104,7 +124,7 @@
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
-.\build\payload\OrbitPet.exe
+.\build\payload\agent-pal.exe
 ```
 
 安装包在 `dist/`，动作和演出预览在 `build/previews/`。只需要程序和预览时，可给构建脚本加上 `-SkipInstaller`。[开发与验证指南](docs/DEVELOPMENT.zh-CN.md)
@@ -117,7 +137,7 @@ Linux 桌面端在 `linux` 分支开发，覆盖 x86_64 与 ARM64，并提供面
 
 ## 贡献
 
-欢迎贡献原创角色、动画工具、桌面体验修复、测试和翻译。通过 [Issues](https://github.com/AHuaWinliver/xianpal-ai-companion/issues) 讨论改动，再按[贡献指南](CONTRIBUTING.md)提交。大功能更新需同步提供中英文 README 图文说明。
+欢迎贡献原创角色、动画工具、桌面体验修复、测试和翻译。通过 [Issues](https://github.com/AHuaWinliver/agent-pal/issues) 讨论改动，再按[贡献指南](CONTRIBUTING.md)提交。大功能更新需同步提供中英文 README 图文说明。
 
 ## 隐私与许可
 

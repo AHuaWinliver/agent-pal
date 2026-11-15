@@ -14,7 +14,7 @@ New-Item -ItemType Directory -Force -Path $outputParent | Out-Null
 if((Get-Item -LiteralPath $outputParent).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Linked output directory is not allowed.'}
 $destination=Join-Path $outputParent $characterProfile.id
 if(Test-Path -LiteralPath $destination){throw 'Destination exists; export to a fresh directory and review before updating the installed pack.'}
-$stagingParent=Join-Path $outputParent ('.xianpal-pack-'+[guid]::NewGuid().ToString('N'))
+$stagingParent=Join-Path $outputParent ('.agent-pal-pack-'+[guid]::NewGuid().ToString('N'))
 $staging=Join-Path $stagingParent $characterProfile.id
 New-Item -ItemType Directory -Path $staging -Force | Out-Null
 try {

@@ -15,9 +15,9 @@ a best-effort basis for the latest public release; the project does not offer an
 
 ## Security boundaries
 
-XianPal integrates with a locally installed Claude Code CLI. Claude's configuration,
+agent-pal integrates with a locally installed Claude Code CLI. Claude's configuration,
 the operating-system user and the service selected by that user determine its
-permissions and data processing. XianPal is not an execution sandbox and must not
+permissions and data processing. agent-pal is not an execution sandbox and must not
 bypass Claude Code's workspace-trust or permission prompts.
 
 External character packs contain configuration and PNG frames; they do not load

@@ -3,7 +3,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Collections.Generic;
-using XianPal;
+using AgentPal;
 
 internal static class CompanionMotionTests
 {

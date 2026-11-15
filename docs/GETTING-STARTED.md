@@ -2,15 +2,15 @@
 
 [简体中文](GETTING-STARTED.zh-CN.md)
 
-## Install XianPal
+## Install agent-pal
 
-Download the Windows installer from [Releases](https://github.com/AHuaWinliver/xianpal-ai-companion/releases). Use the package's SHA256 checksum to verify your download. The current installer is unsigned. For a source build, use a short path such as `C:\src\xianpal` to avoid legacy .NET Framework path limits.
+Download the Windows installer from [Releases](https://github.com/AHuaWinliver/agent-pal/releases). Use the package's SHA256 checksum to verify your download. The current installer is unsigned. For a source build, use a short path such as `C:\src\agent-pal` to avoid legacy .NET Framework path limits.
 
 The installer runs for the current user, offers an installation folder and language choice, and previews the original companions. It registers its own Claude hooks, backs up the existing settings and preserves other handlers. Silent installation also registers hooks. Preview builds on a development branch may contain features absent from the latest published installer; check its release notes.
 
 ## Connect Claude Code
 
-First verify that your own Claude Code CLI can start in an ordinary terminal, reach your configured model service and complete authentication. XianPal does not bundle a model, credentials or a CLI installation.
+First verify that your own Claude Code CLI can start in an ordinary terminal, reach your configured model service and complete authentication. agent-pal does not bundle a model, credentials or a CLI installation.
 
 Right-click the companion and open **Default settings**. Set a working directory, then configure a global executable and optional JSON settings file. Each companion can override either field independently; an empty field inherits its global default. See [companion profiles](COMPANION-PROFILES.md).
 

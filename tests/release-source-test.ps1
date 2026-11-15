@@ -3,13 +3,13 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $version = [IO.File]::ReadAllText((Join-Path $projectRoot 'VERSION')).Trim()
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid public VERSION' }
-foreach ($path in @('src/DesktopTasks/XianPal/Program.cs','src/DesktopTasks/XianPal.Installer/Program.cs')) {
+foreach ($path in @('src/DesktopTasks/AgentPal/Program.cs','src/DesktopTasks/AgentPal.Installer/Program.cs')) {
     $text = [IO.File]::ReadAllText((Join-Path $projectRoot $path))
     foreach ($name in @('AssemblyVersion','AssemblyFileVersion')) {
         if ([regex]::Match($text, ($name + '\("([0-9.]+)"\)')).Groups[1].Value -ne ($version + '.0')) { throw ('Version mismatch: '+$path+' '+$name) }
     }
 }
-$installer = [IO.File]::ReadAllText((Join-Path $projectRoot 'src/DesktopTasks/XianPal.Installer/Program.cs'))
+$installer = [IO.File]::ReadAllText((Join-Path $projectRoot 'src/DesktopTasks/AgentPal.Installer/Program.cs'))
 if ([regex]::Match($installer, 'const string Version = "([0-9.]+)"').Groups[1].Value -ne $version) { throw 'Installer constant disagrees with VERSION' }
 $changelog = [IO.File]::ReadAllText((Join-Path $projectRoot 'CHANGELOG.md'))
 if ($changelog -notmatch ('(?m)^##[ \t]+' + [regex]::Escape($version) + '(?:[ \t]|$)')) { throw ('Changelog entry missing for '+$version) }
@@ -21,7 +21,7 @@ if ($defaultReadme -ne [IO.File]::ReadAllText((Join-Path $projectRoot 'README.en
 foreach ($file in Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/DesktopTasks') -Recurse -Filter '*.cs' -File) {
     $source = [IO.File]::ReadAllText($file.FullName)
     foreach ($match in [regex]::Matches($source, '(?m)^\s*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)')) {
-        if ($match.Groups[1].Value -notmatch '^XianPal(?:\.[A-Za-z_][A-Za-z0-9_]*)*$') { throw ('Unexpected application namespace: '+$file.Name) }
+        if ($match.Groups[1].Value -notmatch '^AgentPal(?:\.[A-Za-z_][A-Za-z0-9_]*)*$') { throw ('Unexpected application namespace: '+$file.Name) }
     }
 }
 foreach ($script in @('BuildOriginalCharacters.cs','BuildAppIcon.cs','PublicFiles.ps1','TestRepository.ps1','ExportOpenSource.ps1','WalkingPreview.js','BuildReminderPreviews.cs','BuildReminderPreviews.ps1','BuildReadmeMedia.cs','BuildReadmeMedia.ps1','CharacterPackTool.cs','ValidateCharacterPack.ps1','ExportCharacterPack.ps1')) {
@@ -38,7 +38,7 @@ foreach ($name in @('README.md','README.en.md','README.zh-CN.md')) {
         $target = ($target -split '[#?]',2)[0]
         if ($target -and -not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $path) $target))) { throw ('Broken local README link: '+$name+' -> '+$target) }
     }
-    if (-not $text.Contains('github.com/AHuaWinliver/xianpal-ai-companion')) { throw ('Repository link missing: '+$name) }
+    if (-not $text.Contains('github.com/AHuaWinliver/agent-pal')) { throw ('Repository link missing: '+$name) }
 }
 foreach ($name in @('docs/CHARACTER-CUSTOMIZATION.md','docs/CHARACTER-PACKS.md','docs/templates/CHARACTER-SPEC.md','docs/DEVELOPMENT.md','docs/REMINDER-PERFORMANCES.md','CONTRIBUTING.md')) {
     $path = Join-Path $projectRoot $name

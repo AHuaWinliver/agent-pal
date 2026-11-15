@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
-using XianPal;
+using AgentPal;
 
 internal static class DesktopVisibilityTests
 {
@@ -18,8 +18,8 @@ internal static class DesktopVisibilityTests
     {
         try
         {
-            Environment.SetEnvironmentVariable("FUFU_TEST_MODE", "1");
-            Environment.SetEnvironmentVariable("FUFU_STATE_DIR", System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "desktop-visibility-test", Guid.NewGuid().ToString("N")));
+            Environment.SetEnvironmentVariable("AGENT_PAL_TEST_MODE", "1");
+            Environment.SetEnvironmentVariable("AGENT_PAL_STATE_DIR", System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "desktop-visibility-test", Guid.NewGuid().ToString("N")));
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Rectangle[] screens = { new Rectangle(0, 0, 1920, 1040), new Rectangle(2560, -800, 1280, 1024), new Rectangle(-1280, 0, 1280, 1024) };

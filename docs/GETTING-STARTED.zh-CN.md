@@ -1,18 +1,18 @@
 [English](GETTING-STARTED.md)
 
-# 开始使用仙伴
+# 开始使用agent-pal
 
 ## 1. 安装桌面程序
 
-从 [Releases](https://github.com/AHuaWinliver/xianpal-ai-companion/releases) 下载 `XianPal-0.6.11-Setup.exe`。若尚未发布安装包，可按仓库 README 从源码构建。
+从 [Releases](https://github.com/AHuaWinliver/agent-pal/releases) 下载 `agent-pal-0.6.11-Setup.exe`。若尚未发布安装包，可按仓库 README 从源码构建。
 
-自行构建时建议将源码放在类似 `C:\src\xianpal` 的短目录，避免 .NET Framework 的传统路径长度限制。安装/快捷方式专项测试默认使用独立的临时短目录，不会修改真实开始菜单。
+自行构建时建议将源码放在类似 `C:\src\agent-pal` 的短目录，避免 .NET Framework 的传统路径长度限制。安装/快捷方式专项测试默认使用独立的临时短目录，不会修改真实开始菜单。
 
 安装器面向当前 Windows 用户运行，创建开始菜单快捷方式并注册联动 Hooks。它会修改当前用户的 Claude 设置并先创建备份，保留其他 Hook 处理器。程序未签名，运行前请核实下载来源与 SHA256。
 
 ## 2. 接上本机 Claude Code
 
-先在普通终端验证你自己的 Claude Code 能正常启动、访问期望的模型服务并完成授权。仙伴不替你安装 CLI，不捆绑账号、密钥或模型，也不绕过目录信任与权限提示。
+先在普通终端验证你自己的 Claude Code 能正常启动、访问期望的模型服务并完成授权。agent-pal不替你安装 CLI，不捆绑账号、密钥或模型，也不绕过目录信任与权限提示。
 
 右键宠物进入功能菜单，设置默认工作目录，然后打开对话或本机 CLI。AI 请求按 CLI 的配置发出，可能访问云端或你配置的内网服务。
 
@@ -38,13 +38,13 @@
 
 ## 6. 安装和更新自己的角色
 
-右键宠物 → **切换形象 → 打开角色资源目录**，将完整人物包复制进去。程序会自动发现新角色，并热更新当前角色的有效资源；无需重新安装。未出现时点“刷新外置角色 / 查看校验结果”。角色包需要配置、动作PNG和校验清单，不能只放一张原画，详见 [资源包热更新教程](CHARACTER-PACKS.zh-CN.md)。
+右键宠物 → **切换形象 → 打开角色资源目录**，将完整人物包复制进去。程序会自动发现新角色，并热更新当前角色的有效资源；无需重新安装。未出现时点“刷新角色资源”。角色包需要配置、动作PNG和校验清单，不能只放一张原画，详见 [资源包热更新教程](CHARACTER-PACKS.zh-CN.md)。
 
 ## 常见边界
 
 - 没有配置 CLI：仍可查看角色、动作和本地提醒，但不能凭空获得模型回复。
 - 看到权限或信任确认：在 CLI 内自行审阅并处理，不建议为便利全局关闭安全机制。
-- 中文 / emoji 或虚拟桌面异常：提供脱敏后的 Windows 版本、缩放、字体和 CLI 版本，见 [问题反馈](https://github.com/AHuaWinliver/xianpal-ai-companion/issues)。
+- 中文 / emoji 或虚拟桌面异常：提供脱敏后的 Windows 版本、缩放、字体和 CLI 版本，见 [问题反馈](https://github.com/AHuaWinliver/agent-pal/issues)。
 - 卸载不会递归删除用户可写的安装目录，程序文件及可能存在的用户文件需自行审阅后清理。
 
 [返回首页](../README.md) · [隐私与配置](PRIVACY.zh-CN.md) · [安全报告](../SECURITY.md)

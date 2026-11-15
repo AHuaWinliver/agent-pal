@@ -5,9 +5,9 @@ $payload=Join-Path $projectRoot 'build/payload'
 if(-not(Test-Path -LiteralPath (Join-Path $payload 'assets/idle/00.png'))){throw 'Run build.ps1 before testing live character packs.'}
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 $testExe=Join-Path $payload 'CharacterPackTests.exe'
-$fixture=Join-Path ([IO.Path]::GetTempPath()) ('xianpal-character-pack-test-'+[guid]::NewGuid().ToString('N'))
+$fixture=Join-Path ([IO.Path]::GetTempPath()) ('agent-pal-character-pack-test-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixture | Out-Null
-$sources=@(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/DesktopTasks/XianPal') -Filter '*.cs' -File | ForEach-Object FullName)
+$sources=@(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/DesktopTasks/AgentPal') -Filter '*.cs' -File | ForEach-Object FullName)
 try {
     & $compiler /nologo /target:exe /main:CharacterPackTests /out:$testExe /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll $sources (Join-Path $PSScriptRoot 'CharacterPackTests.cs')
     if($LASTEXITCODE -ne 0){throw 'Character pack tests failed to compile.'}
