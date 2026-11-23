@@ -7,7 +7,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -71,3 +71,19 @@ jobs:
       - name: Character reminder choreography and transparent presentation
         shell: powershell
         run: ./tests/reminder-performance-test.ps1
+      - name: Default companion order, portraits and About localization
+        shell: pwsh
+        run: |
+          ./tests/default-companions-test.ps1 -PayloadDirectory ./build/payload
+          ./tests/about-presentation-test.ps1
+      - name: Quick tasks, independent team batches and task window identity
+        shell: pwsh
+        run: |
+          ./tests/quick-task-test.ps1
+          ./tests/quick-team-task-test.ps1
+          ./tests/quick-task-shell-test.ps1 -PayloadDirectory ./build/payload
+      - name: Workspace presentation and actual walking occlusion
+        shell: pwsh
+        run: |
+          ./tests/workshop-presentation-test.ps1
+          ./tests/walking-arm-layers-test.ps1

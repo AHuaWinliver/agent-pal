@@ -23,6 +23,8 @@ namespace AgentPal
         private static void Main(string[] args)
         {
             UiLanguageBindings.Initialize();
+            UiMotion.LoadPreference();
+            if(QuickTaskLaunch.Handle(args))return;
             if (args.Length == 4 && (args[0] == "--place-task-console" || args[0] == "--place-task-terminal"))
             {
                 try
@@ -76,7 +78,7 @@ namespace AgentPal
                     Dictionary<string, object> source = serializer.Deserialize<Dictionary<string, object>>(input);
                     Dictionary<string, object> safe = new Dictionary<string, object>();
                     safe["pet_managed"] = managed;
-                    foreach (string key in new[] { "session_id", "cwd", "notification_type", "message_id", "delta", "final" })
+                    foreach (string key in new[] { "session_id", "cwd", "notification_type", "message_id", "delta", "final", "error", "error_details" })
                     {
                         object value;
                         if (source != null && source.TryGetValue(key, out value) && value != null)

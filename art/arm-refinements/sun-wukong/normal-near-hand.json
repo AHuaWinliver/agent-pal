@@ -1,0 +1,23 @@
+{
+  "source": "normal-near-hand-source.png",
+  "crop": [
+    115,
+    1339,
+    632,
+    1894
+  ],
+  "target": [
+    15,
+    239,
+    103,
+    105
+  ],
+  "originalCuffBottom": 247,
+  "anatomicalSide": "left",
+  "screenSide": "right",
+  "palm": "toward torso",
+  "backOfHand": "toward viewer",
+  "thumb": "inward on image-left",
+  "scope": "only replace skin below the original cuff; original sleeve and bracer remain unchanged",
+  "status": "review candidate"
+}

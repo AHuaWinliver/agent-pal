@@ -1,8 +1,10 @@
+param([string]$InstallerPath)
 # SPDX-License-Identifier: Apache-2.0
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
 $version=[IO.File]::ReadAllText((Join-Path $projectRoot 'VERSION')).Trim()
 $installer=Join-Path $projectRoot ('dist/agent-pal-'+$version+'-Setup.exe')
+if($InstallerPath){$installer=[IO.Path]::GetFullPath($InstallerPath)}
 if(-not(Test-Path -LiteralPath $installer)){throw 'Build first'}
 $fixture=Join-Path ([IO.Path]::GetTempPath()) ('agent-pal-hall-install-test-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixture | Out-Null
@@ -17,8 +19,8 @@ try{
             $detail=Get-Content -LiteralPath $diagnostics -Raw -Encoding utf8
             throw ('Isolated installation failed ('+$process.ExitCode+'): '+$detail)
         }
-        $shortcut=Join-Path $env:AGENT_PAL_INSTALL_ROOT 'test-start-menu/agent-pal/agent-pal.lnk'
-        if(-not(Test-Path -LiteralPath $shortcut -PathType Leaf)){throw 'Chinese Start menu shortcut missing after installation'}
+        $shortcut=Join-Path $env:AGENT_PAL_INSTALL_ROOT 'test-start-menu/AgentPal/AgentPal.lnk'
+        if(-not(Test-Path -LiteralPath $shortcut -PathType Leaf)){throw 'AgentPal Start menu shortcut missing after installation'}
     }
     Install-Fixture
     $scene=Join-Path $env:AGENT_PAL_INSTALL_ROOT 'scenes/sect-hall-v2.png'

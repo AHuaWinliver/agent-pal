@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -14,7 +14,7 @@ internal static class CompanionMotionTests
         return new PointF(path[i].X+dx*f+dy/length*offset,path[i].Y+dy*f-dx/length*offset);
     }
     private static PointF[] Arm(double phase,bool left) {
-        return CompanionMotion.ArmPath((float)((left?1:-1)*18*Math.Cos(phase*Math.PI*2-.16)),CompanionMotion.ElbowFlex(phase,left,"running-right"),146,left,"running-right",phase,24);
+        return CompanionMotion.ArmPath((float)CompanionMotion.RelaxedWalkingSwing(phase,left),CompanionMotion.ElbowFlex(phase,left,"running-right"),146,left,"running-right",phase,24);
     }
     private static void CheckNeck(string id)
     {
@@ -95,6 +95,8 @@ internal static class CompanionMotionTests
                     if(state=="wiping-mouth"&&CompanionMotion.GestureEnvelope(phase)>=.99999f) {
                         Assert(Math.Abs(actual.Y-CompanionMotion.GestureMouth(id).Y)<=4.01,"Wipe misses lip height");minX=Math.Min(minX,actual.X);maxX=Math.Max(maxX,actual.X);
                     }
+                    if(id!="pippin"&&CompanionMotion.GestureEnvelope(phase)>=.99999f)
+                        Assert(path[48].X<path[40].X,"Raised right forearm must point from the outer elbow back toward the hand");
                     previous=path;
                 }
                 if(state=="wiping-mouth")Assert(maxX-minX>12,"Wipe has no visible horizontal stroke");
@@ -168,12 +170,13 @@ internal static class CompanionMotionTests
                     double phase=f/240.0;PointF[] path=Arm(phase,left);
                     double length=0;for(int j=1;j<path.Length;j++)length+=Distance(path[j-1],path[j]);
                     Assert(Math.Abs(length-146)<.001,"Sleeve length changed");
-                    Assert(CompanionMotion.ElbowFlex(phase,left,"running-right")>=14 && CompanionMotion.ElbowFlex(phase,left,"running-right")<=34,"Elbow range");
+                    Assert(CompanionMotion.ElbowFlex(phase,left,"running-right")>=1 && CompanionMotion.ElbowFlex(phase,left,"running-right")<=3,"Walking elbow is held bent rather than relaxed");
                     // The sewn shoulder cap is intentionally fixed; compare the
                     // moving upper arm below it against the forearm instead.
                     PointF a=new PointF(path[8].X-path[7].X,path[8].Y-path[7].Y),b=new PointF(path[23].X-path[18].X,path[23].Y-path[18].Y);
                     double delta=Math.Abs(Math.Atan2(a.X,a.Y)-Math.Atan2(b.X,b.Y))*180/Math.PI;
-                    Assert(delta>10,"Forearm is still rigidly aligned to upper arm");
+                    Assert(delta<8,"Walking upper arm and forearm do not hang naturally straight");
+                    Assert(path[24].Y-path[0].Y>140&&Math.Abs(path[24].X-path[0].X)<24,"Whole walking arm is not hanging below its shoulder");
                     if(previous!=null)Assert(Distance(path[24],previous[24])<3,"Hand discontinuity");
                     if(previous!=null)for(int j=0;j<=3;j++)Assert(Distance(path[j],previous[j])<.0001,"Sewn shoulder cap moved");
                     previous=path;
@@ -194,7 +197,7 @@ internal static class CompanionMotionTests
                 }
             }
             Console.WriteLine("PASS reviewed per-character shoulder anchors and phase-independent sewn sleeve roots");
-            Console.WriteLine("PASS 24-band hidden elbow curvature, constant sleeve length, opposite hands/feet, continuous cyclic joints");
+            Console.WriteLine("PASS relaxed straight hanging arms, small opposite hand/foot swing, constant sleeve length and continuous cyclic joints");
             foreach(string id in new[]{"orbit","spark","moss","pippin"}) {
                 CheckNeck(id);
                 CheckDirection(id);
@@ -214,6 +217,46 @@ internal static class CompanionMotionTests
                 Assert(varied,"Expressions must not repeat on a fixed gait beat");
                 Console.WriteLine("PASS "+id+": "+blinks+" blinks / "+smiles+" subtle mouth changes per minute, smooth and independent of gait");
             }
+            int restDuration=0;for(int i=0;i<8;i++)restDuration+=CompanionMotion.GesturePlaybackInterval("bailong","idle",40,8,i);
+            Assert(restDuration>=3000&&CompanionMotion.GesturePlaybackInterval("bailong","idle",40,8,6)<=150,"Idle breathing or blink duration is unnatural");
+            Assert(Math.Abs(CompanionMotion.GesturePlaybackInterval("sun-wukong","review",16,24)*24-1400)<24,"24-pose thinking cycle must retain its intended duration");
+            Console.WriteLine("PASS readable idle breathing and blink dwell, and frame-count-aware thinking duration");
+            foreach(int bend in new[]{-1,1})foreach(float radius in new[]{0f,8f,42f,80f,103f,150f})for(int f=0;f<=360;f++) {
+                double t=f*Math.PI/180;var root=new PointF(224,217);var goal=new PointF(root.X+radius*(float)Math.Cos(t),root.Y+radius*(float)Math.Sin(t));
+                var pose=CompanionMotion.SolveArm(root,goal,47,56,bend);
+                Assert(Distance(pose[0],root)<.0001,"Imported shoulder leaves garment socket");
+                Assert(Math.Abs(Distance(pose[0],pose[1])-47)<.0001&&Math.Abs(Distance(pose[1],pose[2])-56)<.0001,"Imported arm stretches rather than bends");
+                Assert(!float.IsNaN(pose[1].X)&&!float.IsNaN(pose[2].Y),"Folded or unreachable arm produces invalid pose");
+                if(radius>=10&&radius<=102)Assert(Distance(pose[2],goal)<.0001,"Reachable palm fails to meet its target");
+            }
+            Console.WriteLine("PASS fixed-length articulated upper arms and forearms, reachable palm contact, stable sockets and bounded unreachable targets");
+            foreach(PointF root in new[]{new PointF(144,218),new PointF(224,217),new PointF(142,233),new PointF(258,233)}) {
+                PointF hand=CompanionMotion.RelaxedRestingPalm(root);
+                Assert(Math.Abs(hand.X-root.X)<.0001&&hand.Y-root.Y>99.9,"Resting hands must hang directly below the shoulders");
+                for(int frame=0;frame<24;frame++)foreach(bool far in new[]{true,false}) {
+                    PointF walking=CompanionMotion.RelaxedWalkingPalm(root,frame/24.0,far);
+                    Assert(walking.Y-root.Y>99&&Math.Abs(walking.X-root.X)<11,"Walking hand is lifted or swings too widely");
+                }
+            }
+            Console.WriteLine("PASS complete frontal resting arms hang vertically; walking arms remain low with a small pendulum swing");
+            foreach(int direction in new[]{-1,1})foreach(float upper in new[]{39f,44.7f,50f})
+            {
+                float lower=88-upper;PointF root=new PointF(224,217),home=new PointF(224-direction*3.52f,303.24f),raised=new PointF(224+direction*28,156);
+                PointF[] first=null,previous=null;
+                for(int f=0;f<=240;f++)
+                {
+                    float blend=CompanionMotion.GestureEnvelope(f/240.0);
+                    var pose=CompanionMotion.OutwardWavePose(root,home,raised,blend,upper,lower,direction);
+                    Assert(direction*(pose[1].X-root.X)>=-.001,"Wave lowering folds its elbow into the torso");
+                    Assert(Math.Abs(Distance(pose[0],pose[1])-upper)<.001&&Math.Abs(Distance(pose[1],pose[2])-lower)<.001,"Wave changes bone lengths");
+                    if(f==0)first=pose;
+                    if(previous!=null)Assert(Distance(pose[1],previous[1])<3&&Distance(pose[2],previous[2])<5,"Wave lowering flips its elbow or palm between frames");
+                    if(blend==1)Assert(Distance(pose[2],raised)<.001,"Wave no longer reaches its raised palm target");
+                    if(f==240)Assert(Distance(pose[1],first[1])<.001&&Distance(pose[2],first[2])<.001,"Wave does not return to the same resting joints");
+                    previous=pose;
+                }
+            }
+            Console.WriteLine("PASS complete wave raise/lower arcs keep elbows outside the torso, fixed bone lengths, continuous wrists and matching resting endpoints");
             return 0;
         } catch(Exception e) {Console.Error.WriteLine(e);return 1;}
     }

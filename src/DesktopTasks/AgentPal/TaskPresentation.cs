@@ -30,8 +30,10 @@ namespace AgentPal
         {
             if (!UiLanguage.IsEnglish) return task.ScheduleText;
             string time = (task.MinutesAfterMidnight / 60).ToString("00") + ":" + (task.MinutesAfterMidnight % 60).ToString("00");
-            if (task.Recurrence == "daily") return "Daily " + time;
-            if (task.Recurrence == "weekly") return "Every " + CultureInfo.GetCultureInfo("en").DateTimeFormat.DayNames[Math.Max(0, Math.Min(6, task.Weekday))] + " " + time;
+            if(task.Recurrence=="weekly-interval")return WeekdaySchedule.Describe(task.WeekdayMask,true)+" from "+time+
+                ", every "+task.IntervalMinutes+" min (each selected day)";
+            if (task.Recurrence != "interval")
+                return WeekdaySchedule.Describe(WeekdaySchedule.ForTask(task.Recurrence, task.Weekday, task.WeekdayMask), true) + " " + time;
             int minutes = Math.Max(1, task.IntervalMinutes);
             if (minutes % 1440 == 0) return "Every " + minutes / 1440 + (minutes == 1440 ? " day" : " days");
             if (minutes % 60 == 0) return "Every " + minutes / 60 + (minutes == 60 ? " hour" : " hours");

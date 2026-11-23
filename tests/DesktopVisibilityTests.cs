@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Reflection;
 using System.Threading;
@@ -38,13 +38,13 @@ internal static class DesktopVisibilityTests
                 Require((string)Field(pet, "desktopScopeError") == "", "all-desktop pin or current-desktop fallback succeeds on this Windows");
                 string pinError;
                 Require(VirtualDesktopService.TrySetWindowPinned(pet.Handle, true, out pinError), "Explorer per-window pin confirmed");
-                foreach (float scale in new[] { 0.75f, 1f, 1.25f, 0.5f })
+                foreach (float scale in new[] { 0.375f, 0.5f, 0.625f, 0.5f })
                 {
                     Call(pet, "SetPetScale", scale, false); Pump(100);
                     Require(pet.ClientSize == PetForm.PetCanvasSize(scale) && (Size)Field(pet, "cachedCanvasSize") == pet.ClientSize && pet.LayeredRenderSucceeded, "resize " + scale + " retains canvas and cache proportions");
                 }
-                ToolStripMenuItem show = (ToolStripMenuItem)Field(pet, "showPetItem"), hide = (ToolStripMenuItem)Field(pet, "hidePetItem");
-                Require(show.Text == "显示宠物" && hide.Text == "隐藏宠物", "shared pet/tray menu contains explicit show/hide");
+                ToolStripMenuItem show = (ToolStripMenuItem)Field(pet, "visibilityItem"), hide=show;
+                Require(hide.Text == UiLanguage.Text("隐藏伙伴"), "shared menu has a single visibility toggle");
                 hide.PerformClick(); Pump(1200);
                 Require(!pet.Visible && (bool)Field(pet, "userHidden") && show.Enabled, "intentional hiding survives visibility watchdog");
                 ReplyBubbleForm bubble = (ReplyBubbleForm)Field(pet, "replyBubble");
@@ -111,7 +111,7 @@ internal static class DesktopVisibilityTests
             }
             var cache=(System.Collections.IDictionary)Field(pet,"walkingExpressionCache");
             Require(cache.Count==72,id+" expressions render both directions with bounded bitmap cache");
-            Call(pet,"SetPetScale",pet.ClientSize==PetForm.PetCanvasSize(.75f)?1f:.75f,false);
+            Call(pet,"SetPetScale",pet.ClientSize==PetForm.PetCanvasSize(.375f)?.625f:.375f,false);
             Require(((System.Collections.IDictionary)Field(pet,"walkingExpressionCache")).Count<=1&&Object.ReferenceEquals(clock,Field(pet,"walkingExpressionClock")),id+" resize clears face handles without resetting expression cadence");
             Set(pet,"state","idle");
             var states=(System.Collections.Generic.Dictionary<string,System.Collections.Generic.List<Image>>)Field(pet,"animations");

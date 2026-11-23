@@ -12,6 +12,10 @@
 /RELEASE-2.3.28.md
 /tools/*
 !/tools/BuildOriginalCharacters.cs
+!/tools/BuildOriginalCharacters.Custom.cs
+!/tools/PrepareCompanionRig.cs
+!/tools/BuildCompanionReview.py
+!/tools/RebuildCompanionPack.ps1
 !/tools/BuildAppIcon.cs
 !/tools/ExportOpenSource.ps1
 !/tools/TestRepository.ps1
@@ -24,6 +28,10 @@
 !/tools/CharacterPackTool.cs
 !/tools/ValidateCharacterPack.ps1
 !/tools/ExportCharacterPack.ps1
+!/tools/BuildWukongPack.py
+!/tools/PreviewWukongPack.py
+!/tools/BuildShellPackage.py
+!/tools/BuildShellExtension.ps1
 *.exe
 *.dll
 *.pdb
@@ -57,3 +65,8 @@ scheduled-task-runs/
 /tests/CharacterDiagnostic.cs
 /tests/CheckWalkMirrors.cs
 /tests/desktop-package-test.ps1
+
+!/tools/BuildProductMedia.cs
+
+!/tools/BuildBrand.py
+!/tools/BuildBrandOverview.py

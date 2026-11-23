@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -122,7 +122,7 @@ namespace AgentPal
         {
             bool walking=state.StartsWith("running",StringComparison.Ordinal);double t=phase*Math.PI*2;
             PointF root=walking?WalkingNeckAnchor(id):NeckAnchor(id),target=id=="pippin"?TurtleSocket(phase,walking):root;
-            float angle=walking?WalkingNeckAngle(id,phase):state=="review"?-3+(float)Math.Sin(t)*.6f:state=="failed"?5:state=="eating"?(float)Math.Sin(t)*1.4f:0;
+            float angle=walking?WalkingNeckAngle(id,phase):state=="review"?-3+(float)Math.Sin(t)*.6f:state=="failed"?5:state=="eating"?(float)Math.Sin(t)*1.4f:state=="idle"||state=="waiting"?RestingHeadAngle(id):0;
             float sx=id=="pippin"?1+(walking?(float)Math.Sin(t-.45)*2:state=="eating"?(float)Math.Sin(t)*3:0)/143:1;
             float cosine=(float)Math.Cos(angle*Math.PI/180),sine=(float)Math.Sin(angle*Math.PI/180);
             float a=cosine*sx,b=sine*sx,c=-sine,d=cosine;
@@ -134,6 +134,12 @@ namespace AgentPal
                 PointF[] actual={root};using(Matrix after=g.Transform)after.TransformPoints(actual);
                 g.TranslateTransform(expected[0].X-actual[0].X,expected[0].Y-actual[0].Y,MatrixOrder.Append);
             }
+        }
+        internal static float RestingHeadAngle(string id)
+        {
+            // Counter only part of the tilt painted into the original artwork.
+            // New upright artwork needs no correction; facing direction is kept.
+            if(id=="orbit")return -9;if(id=="spark")return 9;if(id=="moss")return -5;if(id=="pippin")return -7;return 0;
         }
         internal static PointF ShoulderAnchor(string id,bool left)
         {
@@ -157,29 +163,46 @@ namespace AgentPal
         {
             double t=phase*Math.PI*2;
             if(state.StartsWith("running",StringComparison.Ordinal))
-                return 24+(left?-10:10)*Math.Cos(t-.32);
+                return 2+(left?-1:1)*Math.Cos(t-.32);
             if(state=="waving") return 48+9*Math.Sin(t-.4);
             if(state=="review") return 24+4*Math.Sin(t-.3);
             if(state=="eating") return 18+5*Math.Sin(t-.2);
             if(state=="wiping-mouth") return 22+6*Math.Sin(t-.35);
             return 12+2*Math.Sin(t-.2);
         }
+        internal static double RelaxedWalkingSwing(double phase,bool far)
+        {return (far?1:-1)*6*Math.Cos(phase*Math.PI*2-.16);}
+        internal static PointF RelaxedWalkingPalm(PointF shoulder,double phase,bool far)
+        {
+            double angle=-RelaxedWalkingSwing(phase,far)*Math.PI/180;
+            const double reach=99.99;
+            return new PointF(shoulder.X+(float)(Math.Sin(angle)*reach),shoulder.Y+(float)(Math.Cos(angle)*reach));
+        }
+        internal static PointF RelaxedRestingPalm(PointF shoulder)
+        {return new PointF(shoulder.X,shoulder.Y+99.99f);}
         internal static PointF GestureMouth(string id)
         {
             if(id=="pippin")return new PointF(107,270);
             if(id=="spark")return new PointF(196.36f,174.74f);
-            if(id=="moss")return new PointF(170.2f,190.42f);
+            if(id=="moss")return new PointF(200.7f,166.7f);
             return new PointF(219.25f,184.79f);
         }
         internal static float GestureEnvelope(double phase)
-        {return (float)Math.Min(Smooth(phase/.28),Smooth((1-phase)/.28));}
-        internal static int GesturePlaybackInterval(string id,string state,int fallback)
-        {return state=="waving"||state=="wiping-mouth"||(id=="pippin"&&state=="punching")?40:fallback;}
+        {return (float)Math.Min(Smooth(phase/.32),Smooth((1-phase)/.32));}
+        internal static int GesturePlaybackInterval(string id,string state,int fallback,int frameCount=8,int frameIndex=0)
+        {
+            // Wukong's review strip contains three copies of an eight-pose
+            // chin-rub. At 16 ms this repeated almost eight times per second.
+            if((state=="idle"||state=="waiting")&&frameCount==8)return frameIndex%8==6?120:500;
+            if(id=="sun-wukong"&&state=="review")return Math.Max(16,(int)Math.Round(1400.0/Math.Max(1,frameCount)));
+            if((id=="sun-wukong"||id=="bailong")&&frameCount>=24&&(state=="punching"||state=="jumping"||state=="eating"||state=="review"))return state=="review"||state=="eating"?60:40;
+            return state=="waving"||state=="wiping-mouth"||(id=="pippin"&&state=="punching")?40:fallback;
+        }
         internal static PointF GestureGrip(string id,string state,double phase)
         {
             bool turtle=id=="pippin";PointF root=turtle?TurtleLegSocket(2,0,false):ShoulderAnchor(id,false),mouth=GestureMouth(id);
             float blend=GestureEnvelope(phase),wave=(float)Math.Sin(phase*Math.PI*4);
-            PointF rest=turtle?new PointF(164,377):new PointF(root.X+12,root.Y+107),goal;
+            PointF rest=turtle?new PointF(164,377):RelaxedRestingPalm(root),goal;
             if(state=="wiping-mouth")goal=new PointF(mouth.X+wave*(turtle?7:10),mouth.Y+3+(float)Math.Cos(phase*Math.PI*4));
             else if(turtle&&state=="punching")goal=new PointF(118-20*(float)Math.Pow(Math.Sin(phase*Math.PI),2),325);
             else if(turtle)goal=new PointF(94+wave*5,309+(float)Math.Cos(phase*Math.PI*4)*3);
@@ -190,13 +213,14 @@ namespace AgentPal
         {
             bool turtle=id=="pippin";PointF root=turtle?TurtleLegSocket(2,0,false):ShoulderAnchor(id,false),goal=GestureGrip(id,state,phase);
             float blend=GestureEnvelope(phase),handStart=turtle?.60f:Math.Max(.34f,gripUv.Y-.14f);
-            double raisedAngle=turtle?(state=="wiping-mouth"?-2.35:state=="punching"?-1.65:-1.85):state=="wiping-mouth"?-Math.PI/2:2.20;
+            double raisedAngle=turtle?(state=="wiping-mouth"?-2.35:state=="punching"?-1.65:-1.85):state=="wiping-mouth"?-2.35:-2.75;
             double angle=raisedAngle*blend;float tx=(float)Math.Sin(angle),ty=(float)Math.Cos(angle),nx=ty,ny=-tx;
             float handOffset=(gripUv.X-.5f)*width;
             PointF palm=new PointF(goal.X-nx*handOffset,goal.Y-ny*handOffset);
             PointF wrist=new PointF(palm.X-tx*(gripUv.Y-handStart)*height,palm.Y-ty*(gripUv.Y-handStart)*height);
             PointF cap=new PointF(root.X-(rootUv.X-.5f)*width,root.Y+(.16f-rootUv.Y)*height);
-            PointF a=new PointF(cap.X+(turtle?-20:24)*blend,cap.Y+14),b=new PointF(wrist.X-tx*18,wrist.Y-ty*18);
+            PointF a=new PointF(cap.X+(turtle?-20:44)*blend,cap.Y+14),b=new PointF(wrist.X-tx*18,wrist.Y-ty*18);
+            if(turtle&&state=="waving")b.X=Math.Min(b.X,Math.Min(root.X,palm.X)-8*blend);
             PointF[] path=new PointF[segments+1];
             for(int i=0;i<=segments;i++)
             {
@@ -214,7 +238,7 @@ namespace AgentPal
         {
             bool walk=state.StartsWith("running",StringComparison.Ordinal);
             double bend=state=="failed-outward"?(left?flexDegrees:-flexDegrees):walk||state=="waving"||state=="punching"?-flexDegrees:(left?-flexDegrees:flexDegrees);
-            double wrist=3*Math.Sin(phase*Math.PI*2-.55)*(left?1:-1);
+            double wrist=(walk?.8:3)*Math.Sin(phase*Math.PI*2-.55)*(left?1:-1);
             PointF[] points=new PointF[segments+1];
             points[0]=new PointF(0,-6);
             for(int i=0;i<segments;i++)
@@ -234,6 +258,38 @@ namespace AgentPal
         }
         internal static double Smooth(double x)
         { x=Math.Max(0,Math.Min(1,x)); return x*x*(3-2*x); }
+        // Interpolate the actual joint angles, not a hand target through an
+        // ambiguous IK branch. The elbow stays outside the torso throughout
+        // both lifting and lowering; forearm rotation follows one continuous arc.
+        internal static PointF[] OutwardWavePose(PointF root,PointF restingPalm,PointF raisedPalm,float blend,float upper,float lower,int outward)
+        {
+            if(outward!=1&&outward!=-1)throw new ArgumentException("Wave outward direction must be +1 or -1.");
+            PointF home=new PointF((restingPalm.X-root.X)*outward,restingPalm.Y-root.Y);
+            PointF goal=new PointF((raisedPalm.X-root.X)*outward,raisedPalm.Y-root.Y);
+            double reach=Math.Sqrt(goal.X*goal.X+goal.Y*goal.Y);
+            if(reach>upper+lower-.009f)throw new ArgumentException("Raised wave target is beyond the arm's reach.");
+            var start=SolveArm(PointF.Empty,home,upper,lower,-1);
+            var end=SolveArm(PointF.Empty,goal,upper,lower,1);
+            double u0=Math.Atan2(start[1].X,start[1].Y),u1=Math.Atan2(end[1].X,end[1].Y);
+            double l0=Math.Atan2(start[2].X-start[1].X,start[2].Y-start[1].Y);
+            double l1=Math.Atan2(end[2].X-end[1].X,end[2].Y-end[1].Y);
+            if(l1<l0)l1+=Math.PI*2;
+            if(u0<-.001||u1<-.001||u0>Math.PI||u1>Math.PI)throw new ArgumentException("Wave elbow must remain outside its shoulder.");
+            double k=Math.Max(0,Math.Min(1,blend)),u=u0+(u1-u0)*k,l=l0+(l1-l0)*k;
+            PointF elbow=new PointF(root.X+outward*upper*(float)Math.Sin(u),root.Y+upper*(float)Math.Cos(u));
+            PointF palm=new PointF(elbow.X+outward*lower*(float)Math.Sin(l),elbow.Y+lower*(float)Math.Cos(l));
+            return new[]{root,elbow,palm};
+        }
+        // Constant-length two-bone solve. Imported palms/gauntlets are rigid
+        // artwork; a target may shorten the reach, never stretch the anatomy.
+        internal static PointF[] SolveArm(PointF shoulder,PointF target,float upper,float lower,int bendSide)
+        {
+            double dx=target.X-shoulder.X,dy=target.Y-shoulder.Y,d=Math.Sqrt(dx*dx+dy*dy);
+            if(d<.001){dx=0;dy=1;d=1;}
+            double ux=dx/d,uy=dy/d,reach=Math.Max(Math.Abs(upper-lower)+.01,Math.Min(upper+lower-.01,d));
+            double along=(upper*upper-lower*lower+reach*reach)/(2*reach),height=Math.Sqrt(Math.Max(0,upper*upper-along*along));
+            return new[]{shoulder,new PointF(shoulder.X+(float)(ux*along-uy*height*bendSide),shoulder.Y+(float)(uy*along+ux*height*bendSide)),new PointF(shoulder.X+(float)(ux*reach),shoulder.Y+(float)(uy*reach))};
+        }
         internal static bool MirrorWalkingFace(string id,string state)
         { return id=="pippin"?state=="running-right":state=="running-left"; }
     }

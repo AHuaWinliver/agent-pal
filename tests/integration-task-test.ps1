@@ -1,4 +1,4 @@
-param([string]$PetPath, [string]$ClaudeSettings)
+param([string]$PetPath, [string]$ClaudeSettings,[string]$BuildDirectory)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (-not $PetPath) { $PetPath = Join-Path $projectRoot 'build\payload\agent-pal.exe' }
@@ -7,7 +7,8 @@ if (-not (Test-Path -LiteralPath $PetPath -PathType Leaf)) { throw 'Build the ap
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $sources = (Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src\DesktopTasks\AgentPal') -Filter '*.cs').FullName
 $testExe = Join-Path $projectRoot 'build\IntegrationTaskTests.exe'
-& $compiler /nologo /target:exe /main:IntegrationTaskTests /out:$testExe /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll $sources (Join-Path $PSScriptRoot 'IntegrationTaskTests.cs')
+if($BuildDirectory){New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null;$testExe=Join-Path $BuildDirectory 'IntegrationTaskTests.exe'}
+& $compiler /nologo /target:exe /main:IntegrationTaskTests /out:$testExe /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll /reference:System.IO.Compression.dll $sources (Join-Path $PSScriptRoot 'IntegrationTaskTests.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Integration tests failed to compile.' }
 $previousEnvironment = @{}
 foreach ($name in @('AGENT_PAL_TEST_MODE','AGENT_PAL_STATE_DIR','AGENT_PAL_PET_MANAGED_SESSION','AGENT_PAL_PET_INTERNAL_TASK_ID')) {

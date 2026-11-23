@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 // Same transform and independent expression timing as PetForm.Expressions.cs.
 let state = 'running-right', frame = 0, paused = false, seconds = 0;
 const smooth = x => { x = Math.max(0, Math.min(1, x)); return x*x*(3-2*x); };
@@ -27,7 +27,7 @@ function expressions(card) {
   const smile = s < 0 || s > 1 ? 0 : Math.min(smooth(s/.24), smooth((1-s)/.32));
   return [Math.round(blink*3), Math.round(smile*3)];
 }
-function faceTransform(g, id, phase) {
+function faceTransform(g, id, phase, attachment = [0,0,0,0]) {
   const t = phase/24*Math.PI*2;
   if (id === 'pippin' ? state === 'running-right' : state === 'running-left') {
     g.translate(384,0); g.scale(-1,1);
@@ -36,6 +36,7 @@ function faceTransform(g, id, phase) {
     g.translate(Math.sin(t)*.9,Math.cos(t*2)*.75);
     g.translate(192,260); g.rotate(Math.sin(t)*.45*Math.PI/180); g.translate(-192,-260);
   }
+  g.translate(attachment[2],attachment[3]);
   const turtle = id === 'pippin', amount = turtle ? .70 : id === 'moss' ? .82 : id === 'spark' ? 1.08 : 1;
   const [x,y] = turtle ? [151,296+20*(1-Math.exp(-20/20))] : id === 'spark' ? [199,187] : id === 'moss' ? [190,200] : [185,194];
   const targetX = x;
@@ -45,6 +46,7 @@ function faceTransform(g, id, phase) {
     g.scale(1+Math.sin(t-.45)*2/143,1);
   }
   g.translate(-x,-y);
+  g.translate(attachment[0],attachment[1]);
 }
 function draw() {
   const n = ['idle','waiting','failed'].includes(state) ? 8 : 24;
@@ -54,7 +56,7 @@ function draw() {
     const g = card.context; g.clearRect(0,0,384,416); g.drawImage(base,0,0);
     if (state.startsWith('running')) {
       const [blink, smile] = expressions(card);
-      g.save(); faceTransform(g, card.canvas.dataset.id, frame%24);
+      g.save(); faceTransform(g, card.canvas.dataset.id, frame%24, JSON.parse(card.canvas.dataset.headAttachment || "[0,0,0,0]"));
       for (const patch of [blink, smile ? smile+3 : 0]) if (patch) {
         const img = image(card,'profile-expressions/'+String(patch).padStart(2,'0')+'.png');
         if (img.complete && img.naturalWidth) g.drawImage(img,0,0);

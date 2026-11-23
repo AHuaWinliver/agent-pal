@@ -14,14 +14,31 @@ namespace AgentPal
         internal string CharacterId;
         internal string WorkingDirectory;
         internal string State;
+        internal string StatusDetail;
         internal string Output;
         internal DateTime Updated;
         internal bool Unread;
+        internal bool CharacterConversation;
+        internal void AppendProcess(string text)
+        {
+            if(String.IsNullOrWhiteSpace(text))return;
+            if(Messages.Count==0||Messages[Messages.Count-1].Role!="assistant")BeginAssistantTurn();
+            ChatMessage reply=Messages[Messages.Count-1];
+            string clean=UiText.Normalize(text).Trim();
+            if(reply.Process!=null&&reply.Process.EndsWith(clean,StringComparison.Ordinal))return;
+            reply.Process=UiText.TailCodeUnits((reply.Process??"")+(String.IsNullOrEmpty(reply.Process)?"":"\n")+clean,6000);
+        }
+        internal void BeginAssistantTurn()
+        {
+            Messages.Add(new ChatMessage { Role = "assistant", Text = "" });
+            TrimMessages();
+        }
         internal readonly List<ChatMessage> Messages=new List<ChatMessage>();
         internal void StartConversation(string prompt)
         { if(Messages.Count==0)Messages.Add(new ChatMessage {Role="user",Text=UiText.Normalize(prompt)}); }
         internal void AppendUserPrompt(string prompt)
         {
+            StatusDetail=null;
             if(Messages.Count==0&&!String.IsNullOrWhiteSpace(Output))Messages.Add(new ChatMessage {Role="assistant",Text=ActivityTrayForm.NormalizeOutput(Output),At=Updated});
             Messages.Add(new ChatMessage {Role="user",Text=UiText.Normalize(prompt)});
             Output=(Output??"")+"\r\n\r\n你："+prompt+"\r\n\r\n";TrimMessages();
@@ -51,11 +68,11 @@ namespace AgentPal
         }
     }
 
-    internal sealed class ActivityTrayForm : Form
+    internal sealed class ActivityTrayForm : AppWindow
     {
         private readonly ListBox list = new ListBox();
         private readonly UnicodeRichTextBox details = new UnicodeRichTextBox();
-        private readonly ChatConversationView conversation=new ChatConversationView();
+        private readonly ChatConversationView conversation=new ChatConversationView(true);
         private readonly Timer renderTimer=new Timer {Interval=120};
         private readonly Dictionary<ActivityRecord,string> drafts=new Dictionary<ActivityRecord,string>();
         private ActivityRecord draftActivity;
@@ -94,7 +111,7 @@ namespace AgentPal
             DoubleBuffered = true;
             Font = UiText.Font(9f);
 
-            Label title = new Label { Text = "agent-pal · 对话", Font = UiText.Font(12f, FontStyle.Bold), ForeColor = Color.FromArgb(34, 55, 44), AutoSize = true, Location = new Point(18, 16) };
+            Label title = new Label { Text = "AgentPal · 对话", Font = UiText.Font(12f, FontStyle.Bold), ForeColor = Color.FromArgb(34, 55, 44), AutoSize = true, Location = new Point(18, 16) };
             heading=title;
             title.AutoSize=false;title.Size=new Size(180,28);title.AutoEllipsis=true;
             Label subtitle = new Label { Text = "Claude Code", Font = UiText.Font(9f), ForeColor = Color.FromArgb(105, 105, 100), AutoSize = true, Location = new Point(214, 20) };
@@ -140,8 +157,8 @@ namespace AgentPal
             reply.BackColor = replyCard.BackColor;
             reply.ForeColor = Color.FromArgb(34, 34, 32);
             reply.Font = UiText.Font(9.5f);
-            reply.Location = new Point(14, 13);
-            reply.Size = new Size(530, 42);reply.Anchor=AnchorStyles.Top|AnchorStyles.Bottom|AnchorStyles.Left|AnchorStyles.Right;
+            reply.Location = new Point(34, 13);
+            reply.Size = new Size(510, 42);reply.Anchor=AnchorStyles.Top|AnchorStyles.Bottom|AnchorStyles.Left|AnchorStyles.Right;
             reply.KeyDown += ReplyKeyDown;
             reply.TextChanged += delegate { UpdateReplyState(); };
             reply.GotFocus += delegate { UpdateReplyState(); };
@@ -152,7 +169,7 @@ namespace AgentPal
             replyPlaceholder.BackColor = replyCard.BackColor;
             replyPlaceholder.Font = reply.Font;
             replyPlaceholder.AutoSize = true;
-            replyPlaceholder.Location = new Point(14, 15);
+            replyPlaceholder.Location = new Point(34, 15);
             replyPlaceholder.Cursor = Cursors.IBeam;
             replyPlaceholder.Click += delegate { if (reply.Enabled) reply.Focus(); };
 
@@ -170,6 +187,7 @@ namespace AgentPal
             replyCard.Controls.Add(reply);
             replyCard.Controls.Add(replyPlaceholder);
             replyCard.Controls.Add(send);
+            replyCard.Controls.Add(new Label {Text="❯",ForeColor=Color.FromArgb(165,100,65),Font=UiText.Font(12f,FontStyle.Bold),Location=new Point(10,16),Size=new Size(24,26)});
 
             Controls.Add(title);
             Controls.Add(subtitle);
@@ -238,15 +256,16 @@ namespace AgentPal
             QueueRender();
         }
 
-        internal void ShowNear(Rectangle petBounds)
+        internal void ShowNear(Rectangle petBounds, bool activate = true)
         {
             if(HeaderDragInProgress)return;
-            pinnedOpen = true;
+            if(activate) pinnedOpen = true;
             Rectangle area = Screen.FromRectangle(petBounds).WorkingArea;
             ChatAnchorLayout layout=ChatAnchorLayout.Below(petBounds,new Size(640,650),area);
-            if(CompanionPositionRequested!=null)CompanionPositionRequested(layout.Pet.Location);
+            if(activate && CompanionPositionRequested!=null)CompanionPositionRequested(layout.Pet.Location);
             ClientSize=layout.Dialog.Size;
             Location=layout.Dialog.Location;
+            if(!activate)return;
             if (!Visible) Show();
             if (list.Items.Count > 0 && list.SelectedIndex < 0) list.SelectedIndex = 0;
             Activate();
@@ -339,7 +358,7 @@ namespace AgentPal
         }
         private void QueueRender(){renderPending=true;if(Visible&&!renderTimer.Enabled)renderTimer.Start();}
         private void RenderSelected()
-        {ActivityRecord item=list.SelectedItem as ActivityRecord;conversation.Present(item);emptyDetails.Visible=item==null;if(heading!=null)heading.Text=(item==null?"agent-pal":String.IsNullOrEmpty(item.CharacterId)?"Claude":TaskPresentation.Owner(item.CharacterId))+" · "+UiLanguage.Text("对话");if(statusCaption!=null)statusCaption.Text=item==null?"Claude Code":"Claude Code · "+UiLanguage.Text(item.State=="正在运行"?"正在回复":item.State??"就绪");UpdateReplyState();}
+        {ActivityRecord item=list.SelectedItem as ActivityRecord;conversation.Present(item);emptyDetails.Visible=item==null;if(heading!=null)heading.Text=(item==null?"agent-pal":String.IsNullOrEmpty(item.CharacterId)?"Claude":TaskPresentation.Owner(item.CharacterId))+" · "+UiLanguage.Text("对话");if(statusCaption!=null)statusCaption.Text=item==null?"Claude Code":"Claude Code · "+UiLanguage.Text(!String.IsNullOrEmpty(item.StatusDetail)?item.State=="正在运行"?"连接异常，正在重试":"执行失败":item.State=="正在运行"?"正在回复":item.State??"就绪");UpdateReplyState();}
         internal ChatConversationView ConversationForTest {get{return conversation;}}
         internal void FlushConversationForTest(){renderPending=false;RenderSelected();}
 
@@ -356,7 +375,7 @@ namespace AgentPal
         {
             ActivityRecord item = list.SelectedItem as ActivityRecord;
             string text = reply.Text.Trim();
-            if (item == null || item.State=="正在运行" || String.IsNullOrWhiteSpace(item.SessionId) || text.Length == 0) return;
+            if (item == null || item.State=="正在运行" || (!item.CharacterConversation && String.IsNullOrWhiteSpace(item.SessionId)) || text.Length == 0) return;
             Func<ActivityRecord, string, bool> handler = ReplySubmitted;
             if (handler != null && handler(item, text))
             {
@@ -368,7 +387,7 @@ namespace AgentPal
         private void UpdateReplyState()
         {
             ActivityRecord item = list.SelectedItem as ActivityRecord;
-            bool canReply = item != null && !String.IsNullOrWhiteSpace(item.SessionId);
+            bool canReply = item != null && (item.CharacterConversation || !String.IsNullOrWhiteSpace(item.SessionId));
             reply.Enabled = canReply;
             send.Enabled = canReply && item.State!="正在运行"&&reply.Text.Trim().Length > 0;
             send.BackColor = send.Enabled ? Color.FromArgb(32, 33, 31) : Color.FromArgb(190, 190, 186);

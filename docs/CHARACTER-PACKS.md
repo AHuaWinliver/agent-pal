@@ -6,6 +6,12 @@ A compatible agent-pal installation can load new companions from local resource 
 
 ## Install or update a pack
 
+On Windows, choose **Companions → Import character pack…**, select the ZIP, then choose **Install and switch** after previewing the character. The ZIP may contain a single `<id>` folder or the contents of that folder. If the ID is already installed, the preview asks you to choose **Replace and switch**. Closing the preview leaves the installed character as it is.
+
+For a collection, put multiple complete character folders directly at the ZIP root. Use the same menu, review the list and any replacements, then choose **Install all**. A collection can contain up to 16 characters and 512 MB, and the installed external character limit is still 16. Importing a collection keeps the current selection.
+
+For an unpacked folder, use the character resource directory:
+
 1. Right-click the companion and open the character resource directory.
 2. Copy the complete `<id>` folder into it. `character.json` must be directly inside that folder.
 3. Wait for the copy to finish, choose **Companions → Refresh character packs**, and select the newly listed custom companion.
@@ -15,7 +21,21 @@ Windows defaults to `%LOCALAPPDATA%\agent-pal\Characters`; `AGENT_PAL_CHARACTER_
 
 Windows debounces changes before validation. The Linux port currently rescans periodically. An invalid update retains the already decoded character in memory; this is not a persistent backup. Invalid files will not load after restart. Keep a separate known-good pack. Removing the selected external pack falls back to Qingheng.
 
+## Create from three images
+
+In the Windows menu, choose **Companions → Create from images…**. Enter a name and choose front, left-facing and right-facing full-body views of the same character. Use PNG or JPEG, up to 16 MB per file and 4096 pixels on the longest edge. Transparent backgrounds and solid backgrounds are supported.
+
+Add an optional **Character description** of up to 4,000 characters. It travels with the pack and sets the character's voice in AI chats. You can also choose one image for **Mystic wings** or a **Spirit vessel**. Wings render behind the character, and the vessel sits beneath its feet. Use **Flight preview** to check the result.
+
+For an installed character, **Companions → Flight artwork** lets you choose either image directly. The selection is saved for that character. **Restore character flight artwork** returns to the appearance supplied by the pack or built into the app.
+
+Select **Next: preview** and check the front and both moving views. The app creates 240 frames locally and fills in the profile, quotes and checksum manifest. Each direction uses its own source image. The biped gait bends elbows and knees, keeps a foot planted through each phase, and moves the arms opposite the legs. It estimates the occluded limbs from the visible sleeve and shoe. Clear wrist and shoe outlines give the most predictable results. The other generated states use basic image motion.
+
+Choose **Install and switch** to save and use the character. Close the preview to return to the image selections.
+
 ## Folder contract
+
+An optional `artifact-wings.png` or `artifact-platform.png` can sit alongside `character.json`. Choose one RGBA PNG up to 512×512 and include its SHA256 in the `files` manifest. The wizard and export tool add it automatically.
 
 ```text
 Characters/my-companion/
@@ -77,3 +97,9 @@ External packs own their complete expression frames. Built-in head/neck paramete
 See the [customization guide](CHARACTER-CUSTOMIZATION.md) for joints, contact points, layering and review criteria. Structural validation does not establish visual quality or artwork rights.
 
 After building, run `tests/character-pack-test.ps1` for isolated add/switch/update/corruption/recovery/removal and export checks. No real model is called.
+
+## Manage companions and trails
+
+Open **Manage companions** from the desktop companion or tray menu. Built-ins appear first and cannot be deleted. Imported packs follow in stable ID order. Deleting a pack removes only its resource folder; conversations, scheduled tasks and profile settings are kept. If the active pack is deleted, AgentPal switches to Qingheng.
+
+Select an imported companion, choose **Trail colors…**, select the swatches and save. The palette is stored outside the resource pack in `companion-appearance.json`; **Restore defaults** clears its override. It applies to dragging and interaction trails and survives resource refreshes and restarts.

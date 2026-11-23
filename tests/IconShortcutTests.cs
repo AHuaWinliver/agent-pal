@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -22,7 +22,7 @@ internal static class IconShortcutTests
             string directory = Path.GetDirectoryName(app);
             Require(Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") == "1" && directory.Contains("desktop-package-test"), "isolated installer state required");
             string version = AssemblyName.GetAssemblyName(app).Version.ToString(3);
-            string iconPath = Path.Combine(directory, "agent-pal-" + version + ".ico");
+            string iconPath = Path.Combine(directory, "agent-pal-brand-v2.ico");
             ValidateIcon(iconPath);
             using (Icon embedded = Icon.ExtractAssociatedIcon(app))
             using (Bitmap bitmap = embedded.ToBitmap()) CheckBitmap(bitmap, "application executable embedded icon");
@@ -30,28 +30,32 @@ internal static class IconShortcutTests
             using (Bitmap bitmap = embedded.ToBitmap()) CheckBitmap(bitmap, "installer executable embedded icon");
 
             Assembly appAssembly = Assembly.LoadFrom(app);
+            Environment.SetEnvironmentVariable("AGENT_PAL_TEST_ASSETS",Path.Combine(directory,"assets"));
+            Type petType=appAssembly.GetType("AgentPal.PetForm");
+            using(IDisposable pet=(IDisposable)Activator.CreateInstance(petType,true))
+            {
+                object tray=petType.GetField("tray",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(pet);
+                object initial=Get(tray,"Icon");
+                foreach(string id in new[]{"orbit","spark","moss","pippin","sun-wukong"})
+                {
+                    petType.GetMethod("SetCharacter",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(pet,new object[]{id,false});
+                    Require(Object.ReferenceEquals(initial,Get(tray,"Icon")),"switching to "+id+" keeps the same product tray icon");
+                }
+            }
+            Type brand=appAssembly.GetType("AgentPal.BrandAssets");
+            using(var wordmark=new Bitmap((Image)brand.GetProperty("Wordmark",BindingFlags.Static|BindingFlags.NonPublic).GetValue(null,null)))
+                Require(wordmark.Width==1600&&wordmark.GetPixel(0,0).A==0,"real Oxanium wordmark is embedded without a runtime font dependency");
             MethodInfo render = appAssembly.GetType("AgentPal.AppIcon").GetMethod("CreateBitmap", BindingFlags.Static | BindingFlags.NonPublic);
             List<string> images = new List<string> { Path.Combine(directory, "assets", "idle", "00.png") };
             foreach (string character in Directory.GetDirectories(Path.Combine(directory, "assets", "characters"))) images.Add(Path.Combine(character, "idle", "00.png"));
             foreach (string path in images)
                 using (Image source = Image.FromFile(path))
-                using (Bitmap bitmap = (Bitmap)render.Invoke(null, new object[] { source, 32 })) CheckBitmap(bitmap, "character tray icon " + Path.GetDirectoryName(Path.GetDirectoryName(path)));
-            Require(images.Count == 4, "all 4 cultivation companion tray icons checked");
+                using (Bitmap bitmap = (Bitmap)render.Invoke(null, new object[] { source, 32 })) CheckBitmap(bitmap, "character portrait badge " + Path.GetDirectoryName(Path.GetDirectoryName(path)),false);
+            Require(images.Count == 4, "four companion badges remain available separately from product identity");
 
             Environment.SetEnvironmentVariable("AGENT_PAL_INSTALL_ROOT", directory);
             Type program = Assembly.LoadFrom(installer).GetType("AgentPal.Installer.Program");
-            MethodInfo hookMatch = program.GetMethod("IsPetHookCommand", BindingFlags.Static | BindingFlags.NonPublic);
-            MethodInfo hookBuild = program.GetMethod("BuildHookCommand", BindingFlags.Static | BindingFlags.NonPublic);
-            string ownHook = (string)hookBuild.Invoke(null, new object[] { "Stop" });
-            Require((bool)hookMatch.Invoke(null, new object[] { ownHook }), "encoded owned hook recognized");
-            Require(!(bool)hookMatch.Invoke(null, new object[] { "echo agent-pal --hook Stop" }), "foreign similarly named hook retained");
-            Require(!(bool)hookMatch.Invoke(null, new object[] { "echo '" + app + "'" }), "path mention without hook is not owned");
-            var mixed = new System.Collections.Hashtable { { "matcher", "test" }, { "hooks", new object[] {
-                new System.Collections.Hashtable { { "command", ownHook } },
-                new System.Collections.Hashtable { { "command", "echo keep-user-hook" } } } } };
-            var groups = new System.Collections.ArrayList { mixed };
-            program.GetMethod("RemoveManagedHookGroups", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { groups });
-            Require(groups.Count == 1 && ((object[])mixed["hooks"]).Length == 1 && (string)((System.Collections.IDictionary)((object[])mixed["hooks"])[0])["command"] == "echo keep-user-hook", "mixed hook group preserves unrelated handlers");
+            Require(program.GetMethod("RegisterHooks",BindingFlags.Static|BindingFlags.NonPublic)==null && program.GetMethod("RemoveHooks",BindingFlags.Static|BindingFlags.NonPublic)==null,"installer has no Claude settings mutation methods");
             program.GetMethod("ValidateInstallLocation", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { true });
             Require(File.ReadAllText(Path.Combine(directory, ".agent-pal-install")) == "agent-pal:3", "installation ownership marker validated");
             string linkPath = (string)program.GetProperty("StartMenuShortcut", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null, null);
@@ -110,26 +114,30 @@ internal static class IconShortcutTests
         {
             Require(String.Equals(Convert.ToString(Get(shortcut, "TargetPath")), app, StringComparison.OrdinalIgnoreCase), "shortcut launches pet, not installer");
             Require(String.Equals(Convert.ToString(Get(shortcut, "WorkingDirectory")), directory, StringComparison.OrdinalIgnoreCase), "shortcut working directory is installed app");
-            Require(Convert.ToString(Get(shortcut, "IconLocation")).StartsWith(icon, StringComparison.OrdinalIgnoreCase), "shortcut uses versioned opaque icon");
+            Require(Convert.ToString(Get(shortcut, "IconLocation")).StartsWith(icon, StringComparison.OrdinalIgnoreCase), "shortcut uses the current approved product icon");
             Require(Convert.ToString(Get(shortcut, "Description")).Contains("Claude Code"), "shortcut describes Claude Code connection");
         }
         finally { Release(shortcut); }
     }
 
-    private static void CheckBitmap(Bitmap bitmap, string label)
+    private static void CheckBitmap(Bitmap bitmap, string label, bool product=true)
     {
-        int orange = 0, contrast = 0;
+        int orange = 0, contrast = 0, light=0,dark=0;
         for (int y = 0; y < bitmap.Height; y++)
             for (int x = 0; x < bitmap.Width; x++)
             {
                 Color pixel = bitmap.GetPixel(x, y);
-                if (pixel.A != 255) throw new Exception(label + " has transparent pixel at " + x + "," + y);
+                if (!product && pixel.A != 255) throw new Exception(label + " has transparent pixel at " + x + "," + y);
+                if(pixel.A<128)continue;
                 if (pixel.R > pixel.G * 1.5 && pixel.R > pixel.B * 1.5 && pixel.R > 120) orange++;
+                if(pixel.R>180&&pixel.G>180&&pixel.B>160)light++;
+                if(pixel.R<80&&pixel.G<80&&pixel.B<80)dark++;
                 // New art is blue/peach/grey, not the retired green robot.
                 // Check readable subject/connector contrast against the opaque badge.
                 if (Math.Abs(pixel.R-255)+Math.Abs(pixel.G-250)+Math.Abs(pixel.B-237)>145) contrast++;
             }
-        Require(orange > 0 && contrast > bitmap.Width*bitmap.Height/20, label + " opaque with visible companion and terminal badge");
+        if(product){Require(bitmap.GetPixel(0,0).A<32&&bitmap.GetPixel(bitmap.Width-1,bitmap.Height-1).A<32,label+" preserves rounded exterior corners");Require(bitmap.GetPixel(bitmap.Width/2,bitmap.Height/10).A>240,label+" retains an opaque black badge");Require(orange>0&&light>bitmap.Width*bitmap.Height/25&&dark>bitmap.Width*bitmap.Height/5,label+" has the approved light AP, bold prompt and coral cursor");}
+        else Require(orange > 0 && contrast > bitmap.Width*bitmap.Height/20, label + " opaque with visible companion and terminal badge");
     }
 
     private static void ValidateIcon(string path)
@@ -149,10 +157,11 @@ internal static class IconShortcutTests
             for (int i = 0; i < sizes.Length; i++)
             {
                 reader.BaseStream.Position = offsets[i] + 40;
-                for (int pixel = 0; pixel < sizes[i] * sizes[i]; pixel++)
-                { reader.ReadByte(); reader.ReadByte(); reader.ReadByte(); RequireAlpha(reader.ReadByte()); }
-                int maskLength = ((sizes[i] + 31) / 32) * 4 * sizes[i];
-                foreach (byte mask in reader.ReadBytes(maskLength)) if (mask != 0) throw new Exception("Transparent ICO AND mask");
+                int size=sizes[i],opaque=0,transparent=0;byte[] alpha=new byte[size*size];
+                for(int pixel=0;pixel<alpha.Length;pixel++){reader.ReadByte();reader.ReadByte();reader.ReadByte();alpha[pixel]=reader.ReadByte();if(alpha[pixel]>240)opaque++;if(alpha[pixel]==0)transparent++;}
+                int stride=((size+31)/32)*4;byte[] mask=reader.ReadBytes(stride*size);
+                Require(opaque>size*size/2&&transparent>0,"ICO "+size+" keeps its black badge and rounded transparency");
+                for(int y=0;y<size;y++)for(int x=0;x<size;x++)if(((mask[y*stride+x/8]&(0x80>>(x%8)))!=0)!=(alpha[y*size+x]==0))throw new Exception("ICO alpha and AND mask disagree");
             }
         }
         foreach (int size in sizes)
@@ -160,5 +169,4 @@ internal static class IconShortcutTests
             using (Bitmap bitmap = icon.ToBitmap()) CheckBitmap(bitmap, "decoded ICO " + size);
     }
 
-    private static void RequireAlpha(byte alpha) { if (alpha != 255) throw new Exception("ICO alpha is not opaque"); }
 }

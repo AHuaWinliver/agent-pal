@@ -10,6 +10,7 @@ namespace AgentPal
     {
         private readonly Label status = new Label();
         private readonly RichTextBox latest = new UnicodeRichTextBox();
+        private readonly Label process = new Label();
         private readonly StringBuilder response = new StringBuilder();
         private readonly ToolTip tips = new ToolTip();
         private readonly Timer renderTimer = new Timer();
@@ -18,12 +19,14 @@ namespace AgentPal
         private int responseVersion;
         private int renderedVersion;
         private int renderCount;
+        private Rectangle lastAnchor;
+        private bool anchored;
         internal const int StreamRenderIntervalMs = 80;
         internal event Action ConversationRequested;
 
         internal ReplyBubbleForm()
         {
-            ClientSize = new Size(340, 78);
+            ClientSize = new Size(400, 190);
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.Manual;
             ShowInTaskbar = false;
@@ -33,7 +36,7 @@ namespace AgentPal
             status.Font = UiText.Font(8.5f, FontStyle.Bold);
             status.ForeColor = Color.FromArgb(28, 116, 74);
             status.Location = new Point(11, 6);
-            status.Size = new Size(282, 19);
+            status.Size = new Size(340, 19);
             Button close = new Button
             {
                 Name = "replyBubbleCloseButton",
@@ -42,7 +45,7 @@ namespace AgentPal
                 BackColor = Color.Transparent,
                 ForeColor = Color.FromArgb(73, 91, 80),
                 Font = new Font("Segoe UI", 11f),
-                Location = new Point(309, 2),
+                Location = new Point(369, 2),
                 Size = new Size(27, 25),
                 Cursor = Cursors.Hand,
                 TabStop = false
@@ -63,7 +66,11 @@ namespace AgentPal
             latest.ShortcutsEnabled = false;
             latest.HideSelection = true;
             latest.Location = new Point(11, 26);
-            latest.Size = new Size(318, 43);
+            latest.Size = new Size(378, 135);
+            process.Bounds=new Rectangle(11,165,378,20);
+            process.Font=UiText.Font(8f);
+            process.ForeColor=Color.FromArgb(104,117,108);
+            process.AutoEllipsis=true;
             status.Cursor = Cursors.Hand;
             latest.Cursor = Cursors.Hand;
             Cursor = Cursors.Hand;
@@ -86,6 +93,7 @@ namespace AgentPal
             Controls.Add(status);
             Controls.Add(latest);
             Controls.Add(close);
+            Controls.Add(process);
             renderTimer.Interval = StreamRenderIntervalMs;
             renderTimer.Tick += delegate { RenderPendingReply(); };
             FormClosing += delegate(object sender, FormClosingEventArgs e)
@@ -105,10 +113,14 @@ namespace AgentPal
             Hide();
         }
 
-        internal void BeginRequest(string promptText, Rectangle petBounds)
+        internal bool HasReply { get { return response.Length > 0; } }
+
+        internal void BeginRequest(string promptText)
         {
+            Hide();
             userDismissed = false;
             response.Length = 0;
+            process.Text="";
             renderTimer.Stop();
             renderPending = false;
             responseVersion = 0;
@@ -116,13 +128,14 @@ namespace AgentPal
             latest.Text = "正在思考：" + Compact(promptText, 80);
             UiText.ApplyMixedGlyphFonts(latest);
             SetStatus("Claude 正在处理…");
-            ShowNear(petBounds);
         }
 
         internal void AppendReply(string text)
         {
             if (String.IsNullOrEmpty(text)) return;
-            response.Append(UiText.Normalize(text));
+            string clean = UiText.Normalize(text);
+            if (!HasReply && String.IsNullOrWhiteSpace(clean)) return;
+            response.Append(clean);
             responseVersion++;
             if (response.Length > 16000)
             {
@@ -151,8 +164,15 @@ namespace AgentPal
                 renderPending = false;
                 return;
             }
-            latest.Text = ExtractLatestSentence(response.ToString());
+            latest.Text = StructuredPreview(response.ToString());
+            int height=Math.Min(320,Math.Max(110,latest.Lines.Length*22+80));
+            ClientSize=new Size(400,height);
+            latest.Height=height-55;process.Top=height-25;
             UiText.ApplyMixedGlyphFonts(latest);
+            CliReplyFormatting.Apply(latest);
+            latest.Select(latest.TextLength,0);
+            latest.ScrollToCaret();
+            if(Visible&&anchored)Location=CalculateLocation(lastAnchor,Size,Screen.FromRectangle(lastAnchor).WorkingArea);
             latest.Invalidate();
             renderedVersion = responseVersion;
             renderPending = false;
@@ -170,6 +190,13 @@ namespace AgentPal
         internal string PreviewTextForTest { get { return latest.Text; } }
 
         internal void SetStatus(string value) { status.Text = UiText.Normalize(value); }
+        internal void AppendProcess(string text)
+        {
+            if(String.IsNullOrWhiteSpace(text))return;
+            string progress=UiText.Normalize(text).Trim();
+            process.Text=progress.Replace("\r"," ").Replace("\n"," ");
+            tips.SetToolTip(process,progress);
+        }
 
         private void OpenConversation(object sender, EventArgs e)
         {
@@ -194,6 +221,7 @@ namespace AgentPal
             if (force) userDismissed = false;
             if (userDismissed) return;
             Rectangle area = Screen.FromRectangle(petBounds).WorkingArea;
+            lastAnchor=petBounds;anchored=true;
             Location = CalculateLocation(petBounds, Size, area);
             if (!Visible) Show();
             // WinForms can apply the startup position during the first Show.
@@ -215,16 +243,12 @@ namespace AgentPal
             return new Point(x, Math.Max(area.Top, y));
         }
 
-        private static string ExtractLatestSentence(string value)
+        private static string StructuredPreview(string value)
         {
-            string clean = Regex.Replace(value ?? "", @"[`*_>#\[\]]", "");
-            clean = Regex.Replace(clean, @"\s+", " ").Trim();
+            string clean = UiText.Normalize(value??"").Trim();
             if (clean.Length == 0) return "Claude 正在思考…";
-            int end = clean.Length - 1;
-            int start = end;
-            while (start > 0 && "。！？.!?；;".IndexOf(clean[start - 1]) < 0) start--;
-            string sentence = clean.Substring(start, end - start + 1).Trim();
-            return Compact(sentence, 135);
+            string[] lines=clean.Replace("\r\n","\n").Split('\n');
+            return UiText.TailCodeUnits(String.Join("\n",lines,Math.Max(0,lines.Length-14),Math.Min(14,lines.Length)),1500);
         }
 
         private static string Compact(string value, int maximum)

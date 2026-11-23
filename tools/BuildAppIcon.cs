@@ -16,7 +16,7 @@ internal static class BuildAppIcon
         Directory.CreateDirectory(args[2]);
         using (Image source = Image.FromFile(args[0]))
             foreach (int size in sizes)
-                using (Bitmap bitmap = AppIcon.CreateBitmap(source, size))
+                using (Bitmap bitmap = AppIcon.CreateBrandBitmap(source, size))
                 {
                     bitmap.Save(Path.Combine(args[2], "icon-" + size + ".png"), ImageFormat.Png);
                     using (MemoryStream stream = new MemoryStream())
@@ -26,14 +26,15 @@ internal static class BuildAppIcon
                         writer.Write(40); writer.Write(size); writer.Write(size * 2);
                         writer.Write((ushort)1); writer.Write((ushort)32); writer.Write(0);
                         writer.Write(size * size * 4); writer.Write(0); writer.Write(0); writer.Write(0); writer.Write(0);
+                        byte[] mask=new byte[maskStride*size];
                         for (int y = size - 1; y >= 0; y--)
                             for (int x = 0; x < size; x++)
                             {
                                 Color pixel = bitmap.GetPixel(x, y);
-                                if (pixel.A != 255) throw new InvalidOperationException("Icon must be fully opaque.");
-                                writer.Write(pixel.B); writer.Write(pixel.G); writer.Write(pixel.R); writer.Write((byte)255);
+                                writer.Write(pixel.B); writer.Write(pixel.G); writer.Write(pixel.R); writer.Write(pixel.A);
+                                if(pixel.A==0)mask[(size-1-y)*maskStride+x/8]|=(byte)(0x80>>(x%8));
                             }
-                        writer.Write(new byte[maskStride * size]); // no transparent mask pixels
+                        writer.Write(mask);
                         images.Add(stream.ToArray());
                     }
                 }
@@ -49,7 +50,7 @@ internal static class BuildAppIcon
             }
             foreach (byte[] image in images) writer.Write(image);
         }
-        Console.WriteLine("Built opaque app icon: 9 sizes (16–256 px).");
+        Console.WriteLine("Built approved rounded app icon: 9 sizes (16–256 px), with alpha and a matching AND mask.");
         return 0;
     }
 }

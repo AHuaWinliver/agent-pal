@@ -15,6 +15,8 @@ namespace AgentPal
         private readonly System.Windows.Forms.Timer characterPackTimer = new System.Windows.Forms.Timer();
         private CharacterPackScan pendingCharacterScan;
         private bool pendingCharacterReport, characterManualRefresh;
+        private bool characterPackDialogOpen;
+        private PetCharacter characterPackSelection;
         private int characterPackDirty, characterScanBusy;
         private long characterPackChangedAt;
         private long characterPackGeneration;
@@ -36,6 +38,28 @@ namespace AgentPal
                 string legacy = Path.Combine(root, "XianPal", "Characters");
                 return !Directory.Exists(current) && Directory.Exists(legacy) ? legacy : current;
             }
+        }
+
+        private void ShowCompanionManager()
+        {
+            characterPackDialogOpen=true;
+            try
+            {
+                using(var window=new CompanionManagerForm(()=>currentCharacterId,p=>SetCharacter(p.Id,true),DeleteImportedCompanion,RefreshTrailAppearance))window.ShowDialog(this);
+            }
+            finally{characterPackDialogOpen=false;RequestCharacterPackRefresh(false);}
+        }
+        private void DeleteImportedCompanion(PetCharacter companion)
+        {
+            CharacterPackRemoval.Remove(CharacterPackDirectory,companion);
+            PetCharacter.RemoveExternalProfile(companion.Id);
+            if(currentCharacterId==companion.Id)SetCharacter("orbit",true);
+            UpdateCharacterChecks();RequestCharacterPackRefresh(false);
+        }
+        private void RefreshTrailAppearance()
+        {
+            trailColors=CompanionAppearance.Colors(currentCharacterId);
+            trailOverlay.Configure(trailColors,trailStyle,trailOpacity);
         }
 
         private void InitializeCharacterPacks()
@@ -78,9 +102,19 @@ namespace AgentPal
 
         private void CharacterPackChanged(object sender, FileSystemEventArgs e)
         {
+            string root = ((FileSystemWatcher)sender).Path;
+            var renamed = e as RenamedEventArgs;
+            if (IsCharacterStagingPath(root, e.FullPath) &&
+                (renamed == null || IsCharacterStagingPath(root, renamed.OldFullPath))) return;
             Interlocked.Exchange(ref characterPackChangedAt, DateTime.UtcNow.Ticks);
             Interlocked.Increment(ref characterPackGeneration);
             Interlocked.Exchange(ref characterPackDirty, 1);
+        }
+
+        private static bool IsCharacterStagingPath(string root, string path)
+        {
+            string prefix = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return path.StartsWith(prefix + ".", StringComparison.OrdinalIgnoreCase);
         }
 
         private void RequestCharacterPackRefresh(bool report)
@@ -94,7 +128,7 @@ namespace AgentPal
 
         private bool CanApplyCharacterPackUpdate()
         {
-            return !dragging && reminderOverlay == null && fileEatOverlay == null && !fileWipeTimer.Enabled &&
+            return !characterPackDialogOpen && !dragging && reminderOverlay == null && fileEatOverlay == null && !fileWipeTimer.Enabled &&
                 (ContextMenuStrip == null || !ContextMenuStrip.Visible) && !clickActionsMenu.Visible;
         }
 
@@ -106,7 +140,13 @@ namespace AgentPal
                 if (!CanApplyCharacterPackUpdate()) return;
                 CharacterPackScan ready = pendingCharacterScan; bool report = pendingCharacterReport;
                 pendingCharacterScan = null; pendingCharacterReport = false;
-                try { ApplyCharacterPackScan(ready, report); } finally { ready.Dispose(); }
+                try
+                {
+                    if (ready.Generation==Interlocked.Read(ref characterPackGeneration) && (characterPackSelection == null || Object.ReferenceEquals(ready.RequestedSelection, characterPackSelection)))
+                        ApplyCharacterPackScan(ready, report);
+                    else characterManualRefresh |= report;
+                }
+                finally { ready.Dispose(); }
             }
             if (closingPet || IsDisposed || characterPackWatchingDisposed) return;
             if (Interlocked.CompareExchange(ref characterPackDirty, 0, 0) == 0 || characterScanBusy != 0 || !IsHandleCreated) return;
@@ -124,12 +164,15 @@ namespace AgentPal
             bool showReport = characterManualRefresh; characterManualRefresh = false;
             Interlocked.Exchange(ref characterScanBusy, 1);
             string activeId = currentCharacterId, revision = loadedCharacterRevision;
+            PetCharacter requestedSelection = characterPackSelection;
             ThreadPool.QueueUserWorkItem(delegate
             {
                 CharacterPackScan scan = null;
                 try
                 {
                     scan = characterPackCatalog.Scan(activeId, revision);
+                    scan.RequestedSelection = requestedSelection;
+                    scan.Generation=generation;
                     CharacterPackScan completed = scan;
                     lock (characterPackDeliveryGate)
                     {
@@ -164,7 +207,7 @@ namespace AgentPal
             var errors = new List<string>(scan.Errors);
             PetCharacter current = PetCharacter.Find(currentCharacterId);
             if (old.IsExternal && current.Id != currentCharacterId) SetCharacter("orbit", true);
-            else if (current.IsExternal && loadedCharacterRevision != current.ResourceRevision)
+            else if (current.UsesPackFrames && loadedCharacterRevision != current.ResourceRevision)
             {
                 try
                 {
@@ -188,7 +231,96 @@ namespace AgentPal
                 }
             }
             characterPackErrors = errors.ToArray(); UpdateCharacterChecks();
+            if (characterPackSelection != null && Object.ReferenceEquals(scan.RequestedSelection, characterPackSelection))
+            {
+                PetCharacter expected = characterPackSelection;
+                characterPackSelection = null;
+                PetCharacter selected = PetCharacter.Find(expected.Id);
+                if (selected.IsExternal && selected.ResourceRevision == expected.ResourceRevision) SetCharacter(selected.Id, true);
+                else MessageBox.Show(UiLanguage.Text("角色已写入资源目录，但未能切换，请查看刷新结果。"),
+                    Program.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
             if (report) ShowCharacterPackReport();
+        }
+
+        private void OpenCharacterPackImport()
+        {
+            if (characterPackDialogOpen || closingPet || IsDisposed) return;
+            string title = UiLanguage.Text("导入角色包…");
+            using (var picker = new OpenFileDialog
+            {
+                Title = title, Filter = UiLanguage.Text("角色包 (*.zip)|*.zip"),
+                CheckFileExists = true, Multiselect = false, RestoreDirectory = true
+            })
+            {
+                if (picker.ShowDialog() != DialogResult.OK) return;
+                PreviewCharacterPackArchive(picker.FileName);
+            }
+        }
+
+        internal void PreviewCharacterPackArchive(string archive)
+        {
+            if (characterPackDialogOpen || closingPet || IsDisposed) return;
+            string root = CharacterPackDirectory;
+            bool batch;
+            try { batch = CharacterPackDraft.IsCollection(archive); }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, UiLanguage.Text("无法准备角色包。"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (batch)
+            {
+                bool installed = false;
+                characterPackDialogOpen = true;
+                try
+                {
+                    using (var preview = new CharacterPackCollectionForm(root, archive))
+                        installed = preview.ShowDialog() == DialogResult.OK;
+                }
+                finally { characterPackDialogOpen = false; }
+                if (installed) RequestCharacterPackRefresh(false);
+                return;
+            }
+            PreviewCharacterPack(UiLanguage.Text("导入角色包…"), UiLanguage.Text("正在检查 ZIP 角色包…"),
+                delegate(CancellationToken token) { return CharacterPackDraft.FromZip(root, archive, token); });
+        }
+
+        private void OpenImageCharacterWizard()
+        {
+            if (characterPackDialogOpen || closingPet || IsDisposed) return;
+            using (var wizard = new CharacterFromImagesForm())
+                while (wizard.ShowDialog() == DialogResult.OK)
+                    if (PreviewCreatedCharacter(wizard.CharacterName, wizard.FrontPath, wizard.LeftPath, wizard.RightPath,
+                        wizard.ArtifactPath, wizard.ArtifactIsWings, wizard.CharacterDescription)) break;
+        }
+
+        internal bool PreviewCreatedCharacter(string name, string front, string left, string right,
+            string artifact = null, bool wings = false, string description = null)
+        {
+            string root = CharacterPackDirectory;
+            return PreviewCharacterPack(UiLanguage.Text("从图片创建…"), UiLanguage.Text("正在制作角色动作…"),
+                delegate(CancellationToken token) { return CharacterPackFromImages.Create(root, name, front, left, right,
+                    token, artifact, wings, description); });
+        }
+
+        private bool PreviewCharacterPack(string title, string status, Func<CancellationToken, CharacterPackDraft> prepare)
+        {
+            if (characterPackDialogOpen || closingPet || IsDisposed) return false;
+            characterPackDialogOpen = true;
+            bool installed = false;
+            try
+            {
+                using (var preview = new CharacterPackPreviewForm(title, status, prepare))
+                    if (preview.ShowDialog() == DialogResult.OK)
+                    {
+                        characterPackSelection = preview.InstalledCharacter;
+                        installed = true;
+                    }
+            }
+            finally { characterPackDialogOpen = false; }
+            if (installed) RequestCharacterPackRefresh(false);
+            return installed;
         }
 
         private string BuildCharacterPackReport()

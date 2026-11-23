@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,13 +15,15 @@ namespace AgentPal
         private readonly Queue<string> walkingExpressionCacheOrder=new Queue<string>();
         private readonly Stopwatch walkingExpressionTime=Stopwatch.StartNew();
         private WalkingExpressionClock walkingExpressionClock;
+        private float[] walkingExpressionAttachment=new float[4];
         private const int WalkingExpressionCacheLimit=72;
 
-        private void AdoptWalkingExpressions(Dictionary<int, Image> patches, string characterId)
+        private void AdoptWalkingExpressions(Dictionary<int, Image> patches, string characterId,float[] attachment=null)
         {
             DisposeWalkingExpressions();
             foreach (var patch in patches) walkingExpressionPatches.Add(patch.Key, patch.Value);
             walkingExpressionClock=patches.Count == 6 ? new WalkingExpressionClock(unchecked(Environment.TickCount+characterId.Length*127),characterId) : null;
+            walkingExpressionAttachment=attachment??new float[4];
             walkingExpressionTime.Restart();
         }
         private void DisposeWalkingExpressionCache()
@@ -55,7 +57,7 @@ namespace AgentPal
                     g.CompositingQuality=CompositingQuality.HighQuality;g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.PixelOffsetMode=PixelOffsetMode.HighQuality;
                     Rectangle box=FitSpriteRectangle(frame.Size,ClientSize);
                     g.TranslateTransform(box.X,box.Y);g.ScaleTransform(box.Width/384f,box.Height/416f);
-                    ApplyWalkingFaceTransform(g,currentCharacterId,state,frameIndex%24);
+                    ApplyWalkingExpressionTransform(g,currentCharacterId,state,frameIndex%24,walkingExpressionAttachment);
                     if(blink>0)g.DrawImage(walkingExpressionPatches[blink],0,0,384,416);
                     if(smile>0)g.DrawImage(walkingExpressionPatches[smile+3],0,0,384,416);
                     }
@@ -67,7 +69,18 @@ namespace AgentPal
             }
             PushLayeredHandle(handle,ClientSize);return true;
         }
+        private static float[] ReadWalkingExpressionAttachment(string file)
+        {
+            if(!File.Exists(file))return new float[4]; // Older resource builds keep their original placement.
+            if(new FileInfo(file).Length>2048)throw new InvalidDataException("Invalid expression attachment size.");
+            var offsets=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<float[]>(File.ReadAllText(file));
+            if(offsets==null||offsets.Length!=4)throw new InvalidDataException("Expression attachment requires four offsets.");
+            foreach(float value in offsets)if(float.IsNaN(value)||float.IsInfinity(value)||Math.Abs(value)>100)throw new InvalidDataException("Invalid expression attachment offset.");
+            return offsets;
+        }
         internal static void ApplyWalkingFaceTransform(Graphics g,string id,string state,int frame)
+        {ApplyWalkingExpressionTransform(g,id,state,frame,null);}
+        internal static void ApplyWalkingExpressionTransform(Graphics g,string id,string state,int frame,float[] offsets)
         {
             double t=frame/24.0*Math.PI*2;
             if(CompanionMotion.MirrorWalkingFace(id,state)){g.TranslateTransform(384,0);g.ScaleTransform(-1,1);}
@@ -76,7 +89,9 @@ namespace AgentPal
                 g.TranslateTransform((float)Math.Sin(t)*.9f,(float)Math.Cos(t*2)*.75f);
                 g.TranslateTransform(192,260);g.RotateTransform((float)Math.Sin(t)*.45f);g.TranslateTransform(-192,-260);
             }
+            if(offsets!=null)g.TranslateTransform(offsets[2],offsets[3]);
             CompanionMotion.ApplyWalkingNeck(g,id,frame/24.0);
+            if(offsets!=null)g.TranslateTransform(offsets[0],offsets[1]);
         }
     }
 }

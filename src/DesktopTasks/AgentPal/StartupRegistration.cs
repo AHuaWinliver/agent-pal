@@ -9,7 +9,8 @@ namespace AgentPal
     // Linked into both the app and installer: one user-facing startup identity.
     internal static class StartupRegistration
     {
-        internal const string DisplayName = "agent-pal";
+        internal const string DisplayName = "AgentPal";
+        internal const string PreviousPackageName = "agent-pal";
         internal const string LegacyName = "OrbitPet";
         internal const string PreviousDisplayName = "仙伴 · AI桌面伴侣";
         private const string RunPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -23,7 +24,7 @@ namespace AgentPal
 
         internal static bool HasEntry(RegistryKey run)
         {
-            return run != null && (run.GetValue(DisplayName) != null || run.GetValue(PreviousDisplayName) != null || run.GetValue(LegacyName) != null);
+            return run != null && (run.GetValue(DisplayName) != null || run.GetValue(PreviousPackageName) != null || run.GetValue(PreviousDisplayName) != null || run.GetValue(LegacyName) != null);
         }
 
         internal static void SetEnabled(bool enabled, string executable)
@@ -44,11 +45,13 @@ namespace AgentPal
             else
             {
                 run.DeleteValue(DisplayName, false);
+                run.DeleteValue(PreviousPackageName, false);
                 run.DeleteValue(LegacyName, false);
                 run.DeleteValue(PreviousDisplayName, false);
                 if (approval != null)
                 {
                     approval.DeleteValue(DisplayName, false);
+                    approval.DeleteValue(PreviousPackageName, false);
                     approval.DeleteValue(LegacyName, false);
                     approval.DeleteValue(PreviousDisplayName, false);
                 }
@@ -63,7 +66,7 @@ namespace AgentPal
             {
                 using (RegistryKey run = Registry.CurrentUser.OpenSubKey(RunPath, true))
                 {
-                    if (run == null || (run.GetValue(LegacyName) == null && run.GetValue(PreviousDisplayName) == null)) return;
+                    if (run == null || (run.GetValue(LegacyName) == null && run.GetValue(PreviousDisplayName) == null && run.GetValue(PreviousPackageName) == null)) return;
                     using (RegistryKey approval = Registry.CurrentUser.OpenSubKey(ApprovalPath, true))
                     {
                         MigrateLegacy(run, approval);
@@ -79,6 +82,7 @@ namespace AgentPal
         internal static void MigrateLegacy(RegistryKey run, RegistryKey approval)
         {
             if (run == null) return;
+            MigrateEntry(run, approval, PreviousPackageName);
             MigrateEntry(run, approval, PreviousDisplayName);
             MigrateEntry(run, approval, LegacyName);
         }

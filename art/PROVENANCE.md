@@ -21,6 +21,15 @@
 This provenance record does not establish exclusivity, copyright eligibility,
 trademark availability, or absolute non-infringement. See ASSET-LICENSE.md.
 
+## Six-companion attachment review (2026-11-23)
+
+- `companion-rigs/sun-wukong` and `companion-rigs/bailong` retain their character-specific source textures and manifests; the two data-only packs are rebuilt with `tools/RebuildCompanionPack.ps1`.
+- `arm-refinements/sun-wukong/normal-near-hand-source.png` is a built-in imagegen edit of the project's existing arm, with the actual prompt, crop and registration recorded beside it. Only the hand below the original cuff is used; the original sleeve and bracer are retained.
+- The hand correction depicts the anatomical left hand, on screen right in a frontal view, with its palm toward the torso and its dorsal surface outward. No outside portrayal or Qwen project asset was introduced.
+- `anatomy-calibration.json` records collar openings, neck masks, shoulder anchors and torso-volume calibration. Local rendering removes duplicate neck pixels from the foreground clothing, buries the rear neck under the collar, and preserves the head's identity and size.
+- Calibration and locally generated validation previews remain distinct from user approval. `companion-baseline.json` records the approved baseline and pending revisions; automatic pixel/geometry checks do not imply approval of the revised artwork.
+- Refined expression imports now retain the neutral canvas, alpha perimeter and neck pixels. This fixes a one-pixel difference between independently cropped Cangzhi expression textures without repainting the approved neutral head.
+
 ## Walking-specific side artwork (2026-10-20)
 
 - side-rigs/*.png were created with the built-in imagegen transparent edit tool,

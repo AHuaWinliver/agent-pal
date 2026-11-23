@@ -1,0 +1,13 @@
+{
+  "name": "Oxanium",
+  "weight": 600,
+  "upstream_revision": "cc5661d43cd4f9aad5567033a8e15ca28dc35c86",
+  "license": "SIL OFL 1.1",
+  "source": "https://github.com/google/fonts/tree/cc5661d43cd4f9aad5567033a8e15ca28dc35c86/ofl/oxanium",
+  "sha256": {
+    "Oxanium[wght].ttf": "2ce01d946e1e1ffc8d7eecfffbda8623bedd63eaf811a20488c4b69af45babb0",
+    "OFL.txt": "fe17c0f2581d71b4e1ea7e636e7f4877c29223e11bb1dd1a871e8c3f2a86336b",
+    "METADATA.pb": "adf6faeb4238003d1d5eb8d15f59c940e145672e3f78bcf82b1802afe9f7c4d2"
+  },
+  "approval": "Selected by user: Oxanium SemiBold, weight 600"
+}

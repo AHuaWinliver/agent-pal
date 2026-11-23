@@ -6,7 +6,7 @@ $compiler=@((Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe
 if(-not $compiler){throw '.NET Framework compiler is required.'}
 $validator=Join-Path ([IO.Path]::GetTempPath()) ('agent-pal-pack-validator-'+[guid]::NewGuid().ToString('N')+'.exe')
 try {
-    & $compiler /nologo /target:exe /out:$validator /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $PSScriptRoot 'CharacterPackTool.cs') (Join-Path $projectRoot 'src/DesktopTasks/AgentPal/CharacterPackCatalog.cs') (Join-Path $projectRoot 'src/DesktopTasks/AgentPal/PetCharacter.cs')
+    & $compiler /nologo /target:exe /out:$validator /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $PSScriptRoot 'CharacterPackTool.cs') (Join-Path $projectRoot 'src/DesktopTasks/AgentPal/CharacterPackCatalog.cs') (Join-Path $projectRoot 'src/DesktopTasks/AgentPal/PetCharacter.cs') (Join-Path $projectRoot 'src/DesktopTasks/AgentPal/DefaultCompanionCatalog.cs')
     if($LASTEXITCODE -ne 0){throw 'Character pack validator failed to compile.'}
     & $validator ([IO.Path]::GetFullPath($PackDirectory))
     if($LASTEXITCODE -ne 0){throw 'Character pack validation failed.'}

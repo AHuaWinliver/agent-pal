@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -110,7 +110,7 @@ namespace AgentPal
             string merged = serializer.Serialize(selected);
             if (Encoding.UTF8.GetByteCount(merged) > serializer.MaxJsonLength)
                 throw new ArgumentException("合并后的 Claude 后台配置超过 2 MiB。");
-            string prompt = "你正在执行桌面宠物的定时任务。从以下目录启动：" + directory + "。遵循 Claude Background 的工作区隔离机制，并在总结中说明实际工作目录。任务：" + task.Prompt;
+            string prompt = "你正在执行桌面伙伴的定时任务。从以下目录启动：" + directory + "。遵循 Claude Background 的工作区隔离机制，并在总结中说明实际工作目录。任务：" + task.Prompt;
             prompt = prompt.Replace("\r", " ").Replace("\n", " ");
             string desktopScript = "";
             if (task.DesktopNumber > 0)

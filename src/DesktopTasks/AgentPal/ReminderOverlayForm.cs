@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -52,7 +52,7 @@ namespace AgentPal
             popupOnly = item != null && !item.IsCountdown && ReminderService.NormalizeEffect(item.Effect) == "popup";
             countdownMode = item != null && item.IsCountdown;
             impactStyle = String.IsNullOrWhiteSpace(reminderStyle) ? "warning" : reminderStyle.ToLowerInvariant();
-            characterName = String.IsNullOrWhiteSpace(petName) ? "桌面宠物" : petName;
+            characterName = String.IsNullOrWhiteSpace(petName) ? "桌面伙伴" : petName;
             characterPerformance = !popupOnly && !countdownMode && ReminderPerformance.Supports(impactStyle);
             Rectangle targetScreen = NormalizeTargetScreen(targetScreenBounds);
             StartPosition = FormStartPosition.Manual;

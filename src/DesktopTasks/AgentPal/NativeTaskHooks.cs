@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -16,6 +16,56 @@ namespace AgentPal
     internal static class NativeTaskHooks
     {
         internal static bool IsNativeRun { get { return !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("AGENT_PAL_PET_NATIVE_RUN_LOG")); } }
+
+#if !AGENT_PAL_LINUX
+        // Never persist integration in a user's global/project Claude settings.
+        // This private overlay lives beside one owned run and is passed with --settings.
+        internal static string CreateSessionSettings(string selectedPath, string logPath)
+        {
+            string log=Path.GetFullPath(logPath);
+            string owned=Path.GetFullPath(Path.Combine(Program.StateDirectory,"scheduled-task-runs"));
+            if(!String.Equals(Path.GetDirectoryName(log),owned,StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Native session settings must belong to an AgentPal run.");
+            var selected=ClaudeSettingsFile.Read(selectedPath);
+            object value;
+            Dictionary<string,object> hooks;
+            if(selected.TryGetValue("hooks",out value))
+            {
+                hooks=value as Dictionary<string,object>;
+                if(hooks==null)throw new ArgumentException("Claude hooks must be a JSON object.");
+            }
+            else selected["hooks"]=hooks=new Dictionary<string,object>();
+            foreach(string name in new[]{"SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PostToolUseFailure","PermissionRequest","Notification","MessageDisplay","Stop","StopFailure","SessionEnd"})
+            {
+                var groups=new List<object>();
+                if(hooks.TryGetValue(name,out value))
+                {
+                    var existing=value as System.Collections.IEnumerable;
+                    if(existing==null||value is string)throw new ArgumentException("Claude hook groups must be arrays.");
+                    foreach(object group in existing)groups.Add(group);
+                }
+                var item=new Dictionary<string,object>();
+                if(name=="Notification")item["matcher"]="permission_prompt|idle_prompt|agent_needs_input|elicitation_dialog";
+                item["hooks"]=new object[]{new Dictionary<string,object>{{"type","command"},{"command",BuildHookCommand(name)},{"timeout",5}}};
+                groups.Add(item);hooks[name]=groups.ToArray();
+            }
+            string output=log+".native-settings.json";
+            if(!String.IsNullOrEmpty(selectedPath)&&String.Equals(Path.GetFullPath(selectedPath),output,StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("The selected settings cannot be the generated run overlay.");
+            string json=new JavaScriptSerializer{MaxJsonLength=2*1024*1024}.Serialize(selected);
+            if(Encoding.UTF8.GetByteCount(json)>2*1024*1024)throw new ArgumentException("Native session settings exceed 2 MiB.");
+            Directory.CreateDirectory(owned);
+            File.WriteAllText(output,json,new UTF8Encoding(false));return output;
+        }
+        private static string BuildHookCommand(string eventName)
+        {
+            string executable=typeof(Program).Assembly.Location.Replace('\\','/').Replace("'","''");
+            string script="$ProgressPreference='SilentlyContinue'; $OutputEncoding=New-Object Text.UTF8Encoding($false); "+
+                "$reader=New-Object IO.StreamReader([Console]::OpenStandardInput(),(New-Object Text.UTF8Encoding($false))); "+
+                "$json=$reader.ReadToEnd(); $json | & '"+executable+"' --hook "+eventName;
+            return "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand "+Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+        }
+#endif
 
         internal static void Publish(string eventName, string input)
         {

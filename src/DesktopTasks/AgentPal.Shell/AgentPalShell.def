@@ -1,0 +1,4 @@
+LIBRARY AgentPalShell
+EXPORTS
+    DllGetClassObject
+    DllCanUnloadNow

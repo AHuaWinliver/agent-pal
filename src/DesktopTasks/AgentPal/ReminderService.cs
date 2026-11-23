@@ -18,6 +18,7 @@ namespace AgentPal
         public int MinutesAfterMidnight;
         // -1 preserves daily recurrence for reminders saved before weekday support.
         public int Weekday = -1;
+        public int WeekdayMask;
         public string Text = "";
         public bool Enabled = true;
         public string LastTriggeredDate = "";
@@ -52,6 +53,7 @@ namespace AgentPal
         private DateTime lastCheck = DateTime.Now.AddMinutes(-1);
         internal event Action Changed;
         internal event Action<DailyReminder> ReminderDue;
+        internal event Action<DailyReminder> PreviewRequested;
 
         internal ReminderService()
         {
@@ -86,16 +88,19 @@ namespace AgentPal
             return Add(time, text, effect, null);
         }
 
-        internal DailyReminder Add(TimeSpan time, string text, string effect, DayOfWeek? weekday)
+        internal DailyReminder Add(TimeSpan time, string text, string effect, DayOfWeek? weekday, int weekdayMask = 0)
         {
             string clean = (text ?? "").Trim();
             if (clean.Length == 0) throw new ArgumentException("请输入提醒事项。", "text");
             if (weekday.HasValue && !Enum.IsDefined(typeof(DayOfWeek), weekday.Value))
                 throw new ArgumentOutOfRangeException("weekday");
+            if (weekdayMask != 0 && !WeekdaySchedule.ValidSelection(weekdayMask))
+                throw new ArgumentOutOfRangeException("weekdayMask");
             DailyReminder reminder = new DailyReminder
             {
                 MinutesAfterMidnight = Math.Max(0, Math.Min(1439, ((int)time.TotalMinutes))),
                 Weekday = weekday.HasValue ? (int)weekday.Value : -1,
+                WeekdayMask = weekdayMask,
                 Text = clean.Length > 300 ? clean.Substring(0, 300) : clean,
                 Enabled = true,
                 Effect = NormalizeEffect(effect)
@@ -109,6 +114,20 @@ namespace AgentPal
         internal DailyReminder StartCountdown(int minutes)
         {
             return StartCountdown(minutes, DateTime.Now);
+        }
+
+        internal void Update(DailyReminder reminder,TimeSpan time,string text,string effect,DayOfWeek? weekday,int weekdayMask=0)
+        {
+            if(reminder==null||reminder.IsCountdown||!reminders.Contains(reminder))throw new InvalidOperationException("提醒已不存在，请重新选择。");
+            string clean=(text??"").Trim();if(clean.Length==0)throw new ArgumentException("请输入提醒事项。","text");
+            if(weekday.HasValue&&!Enum.IsDefined(typeof(DayOfWeek),weekday.Value))throw new ArgumentOutOfRangeException("weekday");
+            if(weekdayMask!=0&&!WeekdaySchedule.ValidSelection(weekdayMask))throw new ArgumentOutOfRangeException("weekdayMask");
+            int minutes=Math.Max(0,Math.Min(1439,(int)time.TotalMinutes)),day=weekday.HasValue?(int)weekday.Value:-1;
+            bool scheduleChanged=reminder.MinutesAfterMidnight!=minutes||reminder.Weekday!=day||reminder.WeekdayMask!=weekdayMask;
+            reminder.MinutesAfterMidnight=minutes;reminder.Weekday=day;reminder.WeekdayMask=weekdayMask;
+            reminder.Text=clean.Length>300?clean.Substring(0,300):clean;reminder.Effect=NormalizeEffect(effect);
+            if(scheduleChanged){reminder.LastTriggeredDate="";reminder.SnoozeUntil="";}
+            Sort();SaveAndNotify();
         }
 
         internal DailyReminder StartCountdown(int minutes, DateTime now)
@@ -169,7 +188,7 @@ namespace AgentPal
 
         internal void TriggerForPreview(DailyReminder reminder)
         {
-            Action<DailyReminder> handler = ReminderDue;
+            Action<DailyReminder> handler = PreviewRequested ?? ReminderDue;
             if (handler != null && reminder != null) handler(reminder);
         }
 
@@ -203,7 +222,7 @@ namespace AgentPal
                     }
                     continue;
                 }
-                if (reminder.Weekday >= 0 && reminder.Weekday != (int)now.DayOfWeek) continue;
+                if (!WeekdaySchedule.Includes(WeekdaySchedule.ForReminder(reminder.Weekday, reminder.WeekdayMask), now.DayOfWeek)) continue;
                 if (!String.Equals(reminder.LastTriggeredDate, today, StringComparison.Ordinal) &&
                     CrossesScheduledTime(reminder.MinutesAfterMidnight, previous, now))
                 {

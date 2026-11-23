@@ -1,12 +1,14 @@
+param([string]$PayloadDirectory)
 # SPDX-License-Identifier: Apache-2.0
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
 $payload=Join-Path $projectRoot 'build/payload'
+if($PayloadDirectory){$payload=[IO.Path]::GetFullPath($PayloadDirectory)}
 if(-not(Test-Path -LiteralPath (Join-Path $payload 'agent-pal.exe'))){throw 'Build first'}
 $target=Join-Path $payload 'HallLayoutTests.exe'
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 $sources=(Get-ChildItem (Join-Path $projectRoot 'src/DesktopTasks/AgentPal') -Filter '*.cs').FullName
-& $compiler /nologo /target:exe /main:HallLayoutTests /out:$target /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll $sources (Join-Path $PSScriptRoot 'HallLayoutTests.cs')
+& $compiler /nologo /target:exe /main:HallLayoutTests /out:$target /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll /reference:System.IO.Compression.dll $sources (Join-Path $PSScriptRoot 'HallLayoutTests.cs')
 if($LASTEXITCODE -ne 0){throw 'Hall layout tests compile failed'}
 $savedMode=$env:AGENT_PAL_TEST_MODE;$savedState=$env:AGENT_PAL_STATE_DIR
 try{

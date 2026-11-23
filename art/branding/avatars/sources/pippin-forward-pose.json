@@ -1,0 +1,39 @@
+{
+  "source": "art/rigs/pippin.png",
+  "regions": "art/rigs/regions.json",
+  "renderer": "tools/BuildOriginalCharacters.cs",
+  "profile": "pippin",
+  "frame": 0,
+  "portrait_only": true,
+  "near_front_limb": {
+    "part": 2,
+    "rotation_degrees": 72,
+    "root_offset_y": -1,
+    "texture_and_mesh": "unchanged"
+  },
+  "depth_order": [
+    "far limbs",
+    "shell and body",
+    "head and neck",
+    "near front limb"
+  ],
+  "far_front_limb_part": 3,
+  "crop": [
+    45,
+    174,
+    180,
+    216
+  ],
+  "render_size": [
+    360,
+    432
+  ],
+  "right_feather": [
+    207,
+    225
+  ],
+  "bottom_feather": [
+    346,
+    358
+  ]
+}

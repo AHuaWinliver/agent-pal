@@ -1,0 +1,33 @@
+{
+  "normalShoulders": [
+    [
+      166,
+      235
+    ],
+    [
+      252,
+      235
+    ]
+  ],
+  "normal": [
+    {
+      "height": 381,
+      "flipX": false
+    },
+    {
+      "height": 374,
+      "flipX": true
+    }
+  ],
+  "profile": [
+    {
+      "height": 405,
+      "flipX": false
+    },
+    {
+      "height": 384,
+      "flipX": false
+    }
+  ],
+  "notes": "Parts 2 and 3 retain stable far/near ownership. Shoulder sockets are calibrated to this body, not the geometry alias. Trim the foreign hair fragment below the profile near hand. Mirror the normal near arm so its thumb faces inward; both profile thumbs face the travel direction. During side walking the far arm is behind the torso and the near arm is in front. Authoritative frontal and profile attachment coordinates are in art/anatomy-calibration.json; use this companion's visible garment sockets, not the orbit geometry alias or a generic x=192 frontal center."
+}

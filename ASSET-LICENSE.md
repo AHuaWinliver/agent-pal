@@ -17,7 +17,19 @@ and third-party contributions before public or commercial distribution.
 Current original identities: 青衡、绯笺、苍芷、小墨. Only broad public genre ideas
 such as robes, cloud patterns, cultivation companionship and turtles are used;
 no affiliation with an existing fictional universe is claimed.
+The bundled Sun Wukong pack reuses the project's existing reviewed AI-assisted
+artwork inspired by the classical mythological character. It does not include
+assets from the user's separate Qwen source tree or claim affiliation with a
+particular television, film or game portrayal. The PNGs and manifest retain
+their previously reviewed animation structure; see art/bundled.
 Windows references system fonts at runtime rather than redistributing them.
+The AgentPal wordmark uses Oxanium SemiBold (weight 600), licensed under
+SIL Open Font License 1.1, not Apache-2.0. The original font, pinned upstream
+revision, checksums, copyright and full license are in art/fonts/oxanium.
+Manrope in art/fonts/manrope was used for earlier typography samples and is
+also under its own OFL 1.1 license. AI-generated concept lettering is not the
+production wordmark: tools/BuildBrand.py generates actual Oxanium outlines.
+The approved AI-assisted AP mark and its production assets are in art/branding.
 The Linux candidate bundles pinned Noto CJK and Color Emoji fonts under their
 separate OFL 1.1 licenses. Font sources, checksums and licenses accompany the
 Linux build resources; those fonts are not relicensed under Apache-2.0.

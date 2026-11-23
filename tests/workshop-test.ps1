@@ -1,11 +1,13 @@
+param([string]$BuildDirectory)
 # SPDX-License-Identifier: Apache-2.0
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 New-Item -ItemType Directory -Force -Path (Join-Path $projectRoot 'build') | Out-Null
 $target = Join-Path $projectRoot 'build/WorkshopTests.exe'
+if($BuildDirectory){New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null;$target=Join-Path $BuildDirectory 'WorkshopTests.exe'}
 $sources = (Get-ChildItem (Join-Path $projectRoot 'src/DesktopTasks/AgentPal') -Filter '*.cs').FullName
-& $compiler /nologo /target:exe /main:WorkshopTests /out:$target /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll $sources (Join-Path $PSScriptRoot 'WorkshopTests.cs')
+& $compiler /nologo /target:exe /main:WorkshopTests /out:$target /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll /reference:System.IO.Compression.dll $sources (Join-Path $PSScriptRoot 'WorkshopTests.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Workshop tests compile failed' }
 $savedMode = $env:AGENT_PAL_TEST_MODE
 $savedDirectory = $env:AGENT_PAL_STATE_DIR

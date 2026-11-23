@@ -20,11 +20,43 @@ internal static class ArtifactTravelTests
         for(int x=0;x<b.Width;x++)if(b.GetPixel(x,0).A!=0||b.GetPixel(x,b.Height-1).A!=0)throw new Exception("vertical clipping");
         for(int y=0;y<b.Height;y++)if(b.GetPixel(0,y).A!=0||b.GetPixel(b.Width-1,y).A!=0)throw new Exception("horizontal clipping");
     }
-    private static Bitmap Render(Image rider,PetCharacter c,float amount,bool left)
+    private static Bitmap Render(Image rider,PetCharacter c,float amount,bool left,Image artwork=null,bool wings=false)
     {
         var b=new Bitmap(384,416,PixelFormat.Format32bppArgb);
-        using(var g=Graphics.FromImage(b))ArtifactTravelArt.Render(g,b.Size,rider,ArtifactTravelArt.FootRow(rider),c.Id,c.ReminderStyle,amount,1.2,left);
+        using(var g=Graphics.FromImage(b))ArtifactTravelArt.Render(g,b.Size,rider,ArtifactTravelArt.FootRow(rider),c.Id,c.ReminderStyle,amount,1.2,left,artwork,wings);
         return b;
+    }
+
+    private static string CustomArtwork(string output)
+    {
+        string path = Path.Combine(output, "flight-artwork-input.png");
+        using (var rider = new Bitmap(384, 416))
+        using (var artwork = new Bitmap(300, 100))
+        using (var g = Graphics.FromImage(rider))
+        using (var a = Graphics.FromImage(artwork))
+        {
+            g.FillRectangle(Brushes.Orange, 166, 105, 52, 289);
+            a.FillPolygon(Brushes.DodgerBlue, new[]
+            {
+                new Point(8, 5), new Point(146, 45), new Point(284, 5), new Point(276, 62),
+                new Point(150, 91), new Point(22, 67)
+            });
+            artwork.Save(path, ImageFormat.Png);
+            var character = PetCharacter.Find("orbit");
+            using (var wings = Render(rider, character, 1f, false, artwork, true))
+            using (var vessel = Render(rider, character, 1f, false, artwork, false))
+            using (var reversed = Render(rider, character, 1f, true, artwork, true))
+            {
+                TransparentEdges(wings); TransparentEdges(vessel); TransparentEdges(reversed);
+                Check(wings.GetPixel(80, 144).B > 200 && wings.GetPixel(192, 174).R > 230,
+                    "custom wings render behind the shoulders while the rider stays in front");
+                Check(vessel.GetPixel(192, 171).R > 230 && vessel.GetPixel(192, 384).B > 200 &&
+                    vessel.GetPixel(80, 144).A == 0, "custom vessel appears below the rider's soles");
+                wings.Save(Path.Combine(output, "custom-flight-wings.png"), ImageFormat.Png);
+                vessel.Save(Path.Combine(output, "custom-flight-vessel.png"), ImageFormat.Png);
+            }
+        }
+        return path;
     }
     private static void Art(string output)
     {
@@ -74,7 +106,7 @@ internal static class ArtifactTravelTests
             watch.Stop();Console.WriteLine("INFO 300 small-canvas flight renders: "+watch.ElapsedMilliseconds+"ms");
         }
     }
-    private static void Integration()
+    private static void Integration(string artwork)
     {
         using(var pet=new PetForm())
         {
@@ -91,6 +123,25 @@ internal static class ArtifactTravelTests
             for(int i=0;i<3;i++){path.Enqueue(new Point(right,origin.Y));path.Enqueue(origin);}
             Call(pet,"PrepareArtifactTravel");Set(pet,"playfulRun",true);
             Check(clock.Active&&ArtifactTravelClock.RouteLength(origin,path)>ArtifactTravelClock.Threshold(area),"closed full-screen route mounts even though start equals destination");
+            using (var menu = (ToolStripMenuItem)Call(pet, "BuildFlightArtworkMenu"))
+                Check(menu.DropDownItems.Find("selectFlightWings", false).Length == 1 &&
+                    menu.DropDownItems.Find("selectFlightPlatform", false).Length == 1,
+                    "the pet exposes separate wings and vessel picture choices");
+            var store = (ArtifactImageStore)Field(pet, "flightArtwork");
+            store.Save("orbit", artwork, true);
+            Call(pet, "ReloadLocalFlightArtwork", "orbit");
+            Check(Field(pet, "localFlightArtwork") != null && (bool)Field(pet, "localArtworkIsWings"),
+                "the selected picture is loaded as wings for the current character");
+            store.Save("orbit", artwork, false);
+            bool vesselIsWings;
+            using (Image saved = new ArtifactImageStore(Program.StateDirectory).Load("orbit", out vesselIsWings))
+                Check(saved != null && !vesselIsWings, "a new store session reads the replacement vessel and its selected mode");
+            bool ignored;
+            using (Image other = store.Load("spark", out ignored))
+                Check(other == null, "a flight artwork override does not leak across characters");
+            Call(pet, "ResetFlightArtwork");
+            Check(!store.Contains("orbit") && Field(pet, "localFlightArtwork") == null,
+                "reset restores the character flight artwork");
             bool movedRight=false,movedLeft=false;int steps=0;
             while(path.Count>0&&steps++<10000)
             {
@@ -132,7 +183,7 @@ internal static class ArtifactTravelTests
             Check(!clock.Active&&clock.Envelope==0&&clock.Speed==0,"smooth landing ends and does not loop");
             clock.Start();clock.Advance(100);clock.BeginLanding();for(int i=0;i<6;i++)clock.Advance(100);Check(!clock.Active,"early interruption can land before full takeoff");
             clock.Start();clock.Reset();Check(!clock.Active&&!clock.Landing,"cancel clears flight state");
-            Art(output);Integration();Console.WriteLine("Artifact travel checks passed; no model calls or user settings changed. Preview: "+Path.Combine(output,"artifact-travel.png"));return 0;
+            Art(output);Integration(CustomArtwork(output));Console.WriteLine("Artifact travel checks passed; no model calls or user settings changed. Preview: "+Path.Combine(output,"artifact-travel.png"));return 0;
         }
         catch(Exception e){Console.Error.WriteLine(e);return 1;}
     }

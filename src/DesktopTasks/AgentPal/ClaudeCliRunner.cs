@@ -12,7 +12,7 @@ using System.Web.Script.Serialization;
 
 namespace AgentPal
 {
-    internal sealed class ClaudeCliRunner : IDisposable
+    internal sealed partial class ClaudeCliRunner : IDisposable
     {
         private Process process;
         private readonly JavaScriptSerializer serializer = new JavaScriptSerializer();
@@ -22,8 +22,13 @@ namespace AgentPal
         private ClaudeTaskStreamRenderer taskStream;
         private string previousTaskStatus;
         private string previousTaskReaction;
+        internal bool SeparateTaskProcess;
+        private string diagnosticFailure = "";
+        internal string FailureKind { get { return taskStream != null && !String.IsNullOrEmpty(taskStream.FailureKind) ? taskStream.FailureKind : !String.IsNullOrEmpty(diagnosticFailure) ? diagnosticFailure : taskStream != null && taskStream.HasResultError ? "cli-error" : ""; } }
         internal event Action<string> OutputReceived;
+        internal event Action<string> DiagnosticReceived;
         internal event Action<string> StatusChanged;
+        internal event Action<string,bool> NoticeReceived;
         internal event Action<int> Completed;
         internal event Action<string> SessionIdentified;
         internal event Action<string> ReactionChanged;
@@ -43,6 +48,8 @@ namespace AgentPal
         internal void Start(string prompt, string workingDirectory, string resumeSessionId, string internalTaskId, string characterId = null)
         {
             if (IsRunning) throw new InvalidOperationException("Claude 正在处理上一个请求。");
+            reportedProcess.Clear();
+            diagnosticFailure = "";
             string claude = FindClaudeCommand(characterId);
             if (claude == null) throw new FileNotFoundException("未找到本机 Claude Code CLI。请先确认终端中可以运行 claude。 ");
 
@@ -51,7 +58,7 @@ namespace AgentPal
             sawStreamingText = false;
             sawAssistantText = false;
             currentSessionId = null;
-            taskStream = String.IsNullOrWhiteSpace(internalTaskId) ? null : new ClaudeTaskStreamRenderer();
+            taskStream = CreateTaskStream(internalTaskId);
             previousTaskStatus = previousTaskReaction = "";
             process = Process.Start(info) ?? throw new InvalidOperationException("Claude Code CLI 启动失败。");
             RaiseStatus("Claude 正在思考…");
@@ -59,6 +66,7 @@ namespace AgentPal
             _ = System.Threading.Tasks.Task.Run(() => ReadLinuxProcess(running, prompt));
 #else
             process = new Process();
+            Process running=process;
             process.StartInfo = info;
             process.EnableRaisingEvents = true;
             process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) { if (e.Data != null) ParseLine(e.Data); };
@@ -68,8 +76,8 @@ namespace AgentPal
                 int code = 1;
                 // A process can exit before its asynchronous readers deliver the
                 // last tool/result event. Drain the owned task's pipes first.
-                if (taskStream != null) { try { process.WaitForExit(); } catch (InvalidOperationException) { } }
-                try { code = process.ExitCode; } catch { }
+                try { running.WaitForExit(); } catch (InvalidOperationException) { }
+                try { code = running.ExitCode; } catch { }
                 Action<int> completed = Completed;
                 if (completed != null) completed(code);
             };
@@ -77,9 +85,10 @@ namespace AgentPal
             sawStreamingText = false;
             sawAssistantText = false;
             currentSessionId = null;
-            taskStream = String.IsNullOrWhiteSpace(internalTaskId) ? null : new ClaudeTaskStreamRenderer();
+            taskStream = CreateTaskStream(internalTaskId);
             previousTaskStatus = previousTaskReaction = "";
             if (!process.Start()) throw new InvalidOperationException("Claude Code CLI 启动失败。");
+            RaiseStatus("Claude 正在思考…");
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             byte[] promptBytes = EncodeInput(prompt);
@@ -87,7 +96,6 @@ namespace AgentPal
             input.Write(promptBytes, 0, promptBytes.Length);
             input.Flush();
             input.Close();
-            RaiseStatus("Claude 正在思考…");
 #endif
         }
 
@@ -193,6 +201,7 @@ namespace AgentPal
             if (taskStream != null)
             {
                 string output = taskStream.Consume(line);
+                if(taskStream.Status=="Claude 已完成回复"&&!taskStream.HasResultError)diagnosticFailure="";
                 if (taskStream.SessionId.Length > 0 && taskStream.SessionId != currentSessionId)
                 { currentSessionId = taskStream.SessionId; if (SessionIdentified != null) SessionIdentified(currentSessionId); }
                 if (output.Length > 0) RaiseOutput(output);
@@ -205,10 +214,13 @@ namespace AgentPal
             {
                 Dictionary<string, object> root = serializer.Deserialize<Dictionary<string, object>>(line);
                 CaptureSession(root);
+                CliFailureNotice notice=CliFailureNotice.FromEvent(root);
+                if(notice!=null){ReportNotice(notice);return;}
+                CaptureProcess(root);
                 string type = GetString(root, "type");
                 if (type == "assistant")
                 {
-                    RaiseStatus("Claude 正在回复…");
+                    if(ExtractContent(GetDictionary(root,"message")).Length>0){diagnosticFailure="";RaiseStatus("Claude 正在回复…");}
                     if (!sawStreamingText)
                     {
                         string assistantText = ExtractContent(GetDictionary(root, "message"));
@@ -227,40 +239,67 @@ namespace AgentPal
                     if (GetString(delta, "type") == "text_delta")
                     {
                         string text = GetString(delta, "text");
-                        if (!String.IsNullOrEmpty(text)) { sawStreamingText = true; RaiseOutput(text); }
+                        if (!String.IsNullOrEmpty(text)) { diagnosticFailure="";RaiseStatus("Claude 正在回复…");sawStreamingText = true; RaiseOutput(text); }
                     }
                     return;
                 }
                 if (type == "result")
                 {
+                    diagnosticFailure="";
                     string result = GetString(root, "result");
                     if (!sawStreamingText && !sawAssistantText && !String.IsNullOrWhiteSpace(result)) RaiseOutput(result);
                     return;
                 }
                 if (type == "system" && GetString(root, "subtype") == "init")
-                    RaiseStatus("Claude CLI 已连接，正在处理…");
+                    RaiseStatus("Claude CLI 已启动，等待响应…");
             }
             catch
             {
-                if (!String.IsNullOrWhiteSpace(line) && !line.StartsWith("{")) RaiseOutput(line);
+                if (!String.IsNullOrWhiteSpace(line) && !line.StartsWith("{")) HandleDiagnostic(line);
             }
+        }
+
+        private ClaudeTaskStreamRenderer CreateTaskStream(string marker)
+        {
+            if(String.IsNullOrWhiteSpace(marker))return null;
+            var renderer=new ClaudeTaskStreamRenderer{IncludeToolOutput=!SeparateTaskProcess};
+            if(SeparateTaskProcess)renderer.Process+=delegate(string text){if(ProcessReceived!=null)ProcessReceived(text);};
+            return renderer;
         }
 
         private void HandleDiagnostic(string line)
         {
+            CliFailureNotice notice=CliFailureNotice.FromDiagnostic(line);
+            if(notice!=null){ReportNotice(notice);return;}
+            string failure = SectPromptPolicy.Classify(line);
+            if (failure.Length > 0) diagnosticFailure = failure;
             if (ShouldSuppressDiagnostic(line))
             {
-                RaiseStatus("Claude CLI 已连接本地模型");
                 return;
             }
-            RaiseOutput(Environment.NewLine + "[CLI] " + line.Trim() + Environment.NewLine);
+            RaiseDiagnostic(Environment.NewLine + "[CLI] " + line.Trim() + Environment.NewLine);
+        }
+
+        private void ReportNotice(CliFailureNotice notice)
+        {
+            diagnosticFailure=notice.Kind;
+            if(NoticeReceived!=null)NoticeReceived(notice.Text,notice.Retrying);
+            else {RaiseDiagnostic(notice.Text);RaiseStatus(notice.Text);}
+            if(!notice.Retrying&&ReactionChanged!=null)ReactionChanged("StopFailure");
+        }
+
+        private void RaiseDiagnostic(string text)
+        {
+            Action<string> handler = DiagnosticReceived;
+            if (handler != null) handler(text);
+            else RaiseOutput(text);
         }
 
         internal static bool ShouldSuppressDiagnostic(string line)
         {
             if (String.IsNullOrWhiteSpace(line)) return true;
-            return line.IndexOf("claude-code:unrecognized_model", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   line.IndexOf("query_source", StringComparison.OrdinalIgnoreCase) >= 0;
+            if(CliFailureNotice.FromDiagnostic(line)!=null)return false;
+            return line.IndexOf("claude-code:unrecognized_model", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         internal static string BuildArguments(string resumeSessionId)

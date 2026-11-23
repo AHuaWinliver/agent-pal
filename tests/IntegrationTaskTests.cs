@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -34,8 +34,18 @@ internal static class IntegrationTaskTests
         {
             string expected = Environment.GetEnvironmentVariable("AGENT_PAL_TEST_EXPECTED_SETTINGS");
             int settings = Array.IndexOf(args, "--settings");
-            if (!String.IsNullOrEmpty(expected) && (settings < 0 || settings + 1 >= args.Length || args[settings + 1] != expected))
-                return 94;
+            if (!String.IsNullOrEmpty(expected))
+            {
+                if(settings<0||settings+1>=args.Length)return 94;
+                if(args[settings+1]!=expected)
+                {
+                    if(args[0]!="--session-id"||!args[settings+1].EndsWith(".native-settings.json",StringComparison.Ordinal))return 94;
+                    var json=new JavaScriptSerializer();var source=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(expected));
+                    var overlay=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(args[settings+1]));
+                    foreach(var entry in source)if(!overlay.ContainsKey(entry.Key)||json.Serialize(overlay[entry.Key])!=json.Serialize(entry.Value))return 94;
+                    if(!overlay.ContainsKey("hooks"))return 94;
+                }
+            }
         }
         if (args.Length > 2 && args[0] == "--session-id") return MockNativeCli(args);
         if (args.Length > 0 && args[0] == "-p")
@@ -91,7 +101,9 @@ internal static class IntegrationTaskTests
             if (String.IsNullOrEmpty(root) || !root.Contains("integration-task-test")) throw new Exception("isolated test state required");
             pet = args[0];
             Environment.SetEnvironmentVariable("AGENT_PAL_NATIVE_TEST_PET", Path.GetFullPath(pet));
-            if (args.Length > 1) ReadInstalledBridge(args[1]);
+            string bridgeLog=Path.Combine(Program.StateDirectory,"scheduled-task-runs","bridge-fixture.log");
+            ReadInstalledBridge((string)Assembly.LoadFrom(pet).GetType("AgentPal.NativeTaskHooks").GetMethod("CreateSessionSettings",BindingFlags.Static|BindingFlags.NonPublic).Invoke(null,new object[]{"",bridgeLog}));
+            TestSessionSettings();
             Directory.CreateDirectory(root);
             Application.EnableVisualStyles();
             TestPreferencesAndHooks();
@@ -129,7 +141,12 @@ internal static class IntegrationTaskTests
         Stopwatch wait = Stopwatch.StartNew();
         while (!File.Exists(log + ".continue") && wait.ElapsedMilliseconds < 12000) Thread.Sleep(50);
         if (!File.Exists(log + ".continue")) return 92;
-        string followup = File.ReadAllText(log + ".continue", Encoding.UTF8);
+        string followup="";
+        for(int attempt=0;;attempt++)
+        {
+            try{followup=File.ReadAllText(log+".continue",Encoding.UTF8);break;}
+            catch(IOException){if(attempt>=20)throw;Thread.Sleep(20);}
+        }
         NativeHook("UserPromptSubmit", new { session_id = session, prompt = followup });
         NativeHook("MessageDisplay", new { session_id = session, delta = "原生继续追问成功 🚀 结束：文件处理完成。", message_id = "followup", index = 0, final = true });
         bool failed = args[2].Contains("FAIL_TEST");
@@ -186,6 +203,7 @@ internal static class IntegrationTaskTests
                         File.WriteAllText(log + ".continue", "用户在原生窗口继续交互", new UTF8Encoding(false));
                         Require(PumpUntil(delegate { return done; }, 8000) && code == (variant == 1 ? 7 : 0), mode + " actual CLI session exit produces correct completion");
                         Require(output.Contains("原生继续追问成功") && Regex.Matches(output, "原生继续追问成功").Count == 1, mode + " same native session accepts another interaction");
+                        Require(PumpUntil(delegate{return !File.Exists(log+".native-settings.json");},1500),mode+" removes its private settings overlay on success or failure");
                         if (mode == "interactive-terminal")
                         {
                             IntPtr window = VirtualDesktopService.FindTaskTerminalWindow(token);
@@ -360,6 +378,25 @@ internal static class IntegrationTaskTests
         }
     }
 
+    private static void TestSessionSettings()
+    {
+        string source=Path.Combine(root,"user-settings.json");
+        string original="{\"model\":\"fixture\",\"env\":{\"SAMPLE\":\"keep\"},\"hooks\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"echo keep\"}]}]}}";
+        File.WriteAllText(source,original,new UTF8Encoding(false));
+        string log=Path.Combine(Program.StateDirectory,"scheduled-task-runs","overlay-test.log");
+        string a=NativeTaskHooks.CreateSessionSettings(source,log),first=File.ReadAllText(a);
+        NativeTaskHooks.CreateSessionSettings(source,log);
+        Require(first==File.ReadAllText(a)&&File.ReadAllText(source)==original,"repeated session overlays do not accumulate hooks or modify the selected settings");
+        string b=NativeTaskHooks.CreateSessionSettings(source,log+"-second");
+        Require(a!=b&&File.Exists(a),"parallel runs receive independent settings overlays");
+        var merged=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(first);
+        var hooks=(Dictionary<string,object>)merged["hooks"];
+        Require(((System.Collections.ICollection)hooks["Stop"]).Count==2 && (string)merged["model"]=="fixture", "overlay retains user hooks and selected model");
+        bool rejected=false;try{NativeTaskHooks.CreateSessionSettings(source,Path.Combine(root,"outside.log"));}catch(ArgumentException){rejected=true;}
+        Require(rejected&&!File.Exists(Path.Combine(root,"outside.log.native-settings.json")),"overlay cannot write outside the private run directory");
+        File.Delete(a);File.Delete(b);
+    }
+
     private static void ReadInstalledBridge(string settingsPath)
     {
         System.Collections.Generic.Dictionary<string, object> settings = new JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string, object>>(File.ReadAllText(settingsPath, Encoding.UTF8));
@@ -376,7 +413,7 @@ internal static class IntegrationTaskTests
                 matches++; installedBridge = command;
                 Require(!command.Contains("WindowStyle") && script.Contains("UTF8Encoding"), "installed hook does not hide caller console and explicitly uses UTF-8");
             }
-        Require(matches == 1, "reinstall leaves exactly one pet hook, not duplicated encoded commands");
+        Require(matches == 1, "private session overlay contains exactly one AgentPal handler for the event");
     }
 
     private static void TestPreferencesAndHooks()

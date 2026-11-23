@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -15,7 +15,7 @@ using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("agent-pal 安装程序")]
+[assembly: AssemblyTitle(AgentPal.StartupRegistration.DisplayName + " 安装程序")]
 [assembly: AssemblyProduct(AgentPal.StartupRegistration.DisplayName)]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
@@ -29,6 +29,8 @@ namespace AgentPal.Installer
         private const string InstallRegistry = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\";
         private const string LegacyExe = "OrbitPet.exe";
         internal static string InstallDirectory = ResolveInstallDirectory();
+        internal static string IntegrationNotice="";
+        internal static bool DeferLaunch;
         internal static string PetExe { get { return Path.Combine(InstallDirectory, "agent-pal.exe"); } }
 
         private static string ResolveInstallDirectory()
@@ -37,7 +39,7 @@ namespace AgentPal.Installer
             if (!String.IsNullOrWhiteSpace(testRoot)) return Path.GetFullPath(testRoot);
             string own = AppDomain.CurrentDomain.BaseDirectory;
             if (Array.Exists(Environment.GetCommandLineArgs(), delegate(string value) { return value == "--uninstall"; }) && IsOwned(own)) return own;
-            foreach (string name in new[] { AppName, "OrbitPet" })
+            foreach (string name in new[] { AppName, StartupRegistration.PreviousPackageName, "OrbitPet" })
             {
                 using (var installed = Registry.CurrentUser.OpenSubKey(InstallRegistry + name))
                 {
@@ -91,7 +93,7 @@ namespace AgentPal.Installer
             catch (Exception error)
             {
                 if (Array.Exists(args, delegate(string value) { return value == "--silent"; })) Console.Error.WriteLine(error.Message);
-                else MessageBox.Show(error.Message, "agent-pal Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                else MessageBox.Show(error.Message, "AgentPal Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 Environment.ExitCode = 1; return;
             }
             if (Array.Exists(args, delegate(string value) { return value == "--uninstall"; }))
@@ -115,24 +117,44 @@ namespace AgentPal.Installer
             Application.Run(new InstallerForm());
         }
 
-        internal static void Install()
+        internal static void Install(Action<int, string> progress = null)
         {
+            IntegrationNotice="";
+            Report(progress, 0, "Preparing installation…");
             ValidateInstallLocation(false);
             Directory.CreateDirectory(InstallDirectory);
             StopPet();
-            ExtractPayload();
+            Report(progress, 3, "Extracting files…");
+            ExtractPayload(progress);
+            Report(progress, 94, "Creating shortcuts and configuring integration…");
             File.WriteAllText(Path.Combine(InstallDirectory, ".agent-pal-install"), "agent-pal:3", new System.Text.UTF8Encoding(false));
             RegisterStartMenuShortcut();
-            RegisterHooks();
+            // Claude configuration is user-owned. Integration is scoped to each launched session.
             if (!TestMode)
             {
                 RegisterStartup();
                 RegisterUninstaller();
             }
             RemoveLegacyShortcut();
-
             if (!TestMode)
+            {
+                // Refresh existing bindings after an upgrade. Certificate consent is
+                // obtained only in the menu settings, never by a silent install.
+                using (Process menu = Process.Start(new ProcessStartInfo(PetExe, "--refresh-quick-commands") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = InstallDirectory }))
+                {
+                    if (!menu.WaitForExit(30000)) { try { menu.Kill(); } catch { } IntegrationNotice=UiLanguage.Text("右键菜单尚未完成注册，请在默认设置中保存并更新快捷任务。"); }
+                    else if(menu.ExitCode!=0)IntegrationNotice=UiLanguage.Text(menu.ExitCode==3?"主菜单扩展等待系统授权，请在默认设置中保存并更新快捷任务。":"右键菜单尚未完成注册，请在默认设置中保存并更新快捷任务。");
+                }
+            }
+
+            if (!TestMode && !DeferLaunch)
                 Process.Start(new ProcessStartInfo(PetExe) { UseShellExecute = true });
+            Report(progress, 100, "Installation complete.");
+        }
+
+        private static void Report(Action<int, string> progress, int percent, string stage)
+        {
+            if (progress != null) progress(percent, UiLanguage.Text(stage));
         }
 
         internal static bool HasClaudeCli()
@@ -151,7 +173,7 @@ namespace AgentPal.Installer
             return false;
         }
 
-        private static void ExtractPayload()
+        private static void ExtractPayload(Action<int, string> progress)
         {
             string staging = Path.Combine(InstallDirectory, ".payload-" + Guid.NewGuid().ToString("N"));
             string assets = Path.Combine(InstallDirectory, "assets");
@@ -171,6 +193,10 @@ namespace AgentPal.Installer
                 if (resource == null) throw new InvalidOperationException("安装包缺少内嵌资源。");
                 using (ZipArchive zip = new ZipArchive(resource, ZipArchiveMode.Read))
                 {
+                    long totalBytes = 0, copiedBytes = 0;
+                    foreach (ZipArchiveEntry entry in zip.Entries) if (!String.IsNullOrEmpty(entry.Name)) totalBytes += entry.Length;
+                    int lastPercent = 3;
+                    byte[] buffer = new byte[81920];
                     foreach (ZipArchiveEntry entry in zip.Entries)
                     {
                         string destination = Path.GetFullPath(Path.Combine(staging, entry.FullName.Replace('/', Path.DirectorySeparatorChar)));
@@ -181,7 +207,15 @@ namespace AgentPal.Installer
                         Directory.CreateDirectory(Path.GetDirectoryName(destination));
                         using (Stream input = entry.Open())
                         using (FileStream output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None))
-                            input.CopyTo(output);
+                        {
+                            int read;
+                            while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                            {
+                                output.Write(buffer, 0, read); copiedBytes += read;
+                                int percent = totalBytes == 0 ? 70 : 3 + (int)(67.0 * copiedBytes / totalBytes);
+                                if (percent != lastPercent) { Report(progress, percent, "Extracting files…"); lastPercent = percent; }
+                            }
+                        }
                     }
                 }
             }
@@ -189,7 +223,9 @@ namespace AgentPal.Installer
             // Validate the clean payload before changing the current install.
             // Overlay extraction leaves old 08..23.png files behind when an
             // animation changes from 24 to 8 frames, so replace the whole tree.
+            Report(progress, 70, "Validating animation resources…");
             ValidatePayload(staging);
+            Report(progress, 78, "Checking existing files…");
             if (File.Exists(PetExe))
             {
                 Directory.CreateDirectory(backup);
@@ -210,6 +246,7 @@ namespace AgentPal.Installer
             }
             // Scene artwork is a separate resource tree, not part of assets/. Promote
             // it transactionally too; top-level file copying otherwise silently drops it.
+            Report(progress, 84, "Installing verified files…");
             string stagedScenes=Path.Combine(staging,"scenes");
             if(!AssetTreesMatch(stagedScenes,scenes))
             {
@@ -222,6 +259,8 @@ namespace AgentPal.Installer
             }
             foreach (string file in Directory.GetFiles(staging, "*", SearchOption.TopDirectoryOnly))
                 File.Copy(file, Path.Combine(InstallDirectory, Path.GetFileName(file)), true);
+            CopyShellSupport(Path.Combine(staging, "shell"), Path.Combine(InstallDirectory, "shell"));
+            Report(progress, 88, "Verifying installed application…");
             ValidatePayload(InstallDirectory);
             string source = Assembly.GetExecutingAssembly().Location;
             File.Copy(source, Path.Combine(InstallDirectory, "Uninstall.exe"), true);
@@ -249,10 +288,11 @@ namespace AgentPal.Installer
 
         private static void ValidatePayload(string directory)
         {
+            if(!File.Exists(Path.Combine(directory,"assets","default-companions.json")))throw new InvalidOperationException("安装资源缺少默认角色索引。");
             string scene=Path.Combine(directory,"scenes","sect-hall-v2.png");
-            if(!File.Exists(scene))throw new InvalidOperationException("安装资源缺少门派大堂背景图。");
+            if(!File.Exists(scene))throw new InvalidOperationException("安装资源缺少 Agent 工作区背景图。");
             using(Image image=Image.FromFile(scene))
-                if(image.Width<320||image.Height<200||image.Width>8192||image.Height>8192)throw new InvalidOperationException("门派大堂背景图校验失败。");
+                if(image.Width<320||image.Height<200||image.Width>8192||image.Height>8192)throw new InvalidOperationException("Agent 工作区背景图校验失败。");
             using (Process test = Process.Start(new ProcessStartInfo(Path.Combine(directory, "agent-pal.exe"), "--self-test") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = directory }))
             {
                 if (!test.WaitForExit(30000))
@@ -262,6 +302,35 @@ namespace AgentPal.Installer
                 }
                 if (test.ExitCode != 0)
                     throw new InvalidOperationException("动画资源校验失败（退出码 " + test.ExitCode + "）。校验目录：" + directory + "。旧资源备份位于安装目录 asset-backups 中。");
+            }
+        }
+
+        private static void CopyShellSupport(string source, string target)
+        {
+            if (!Directory.Exists(source)) return;
+            if (Directory.Exists(target) && (File.GetAttributes(target) & FileAttributes.ReparsePoint) != 0) throw new IOException("The shell support directory cannot be a link.");
+            Directory.CreateDirectory(target);
+            foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+            {
+                string relative = file.Substring(source.Length + 1), destination = Path.Combine(target, relative);
+                string parent = Path.GetDirectoryName(destination), check = parent;
+                while (check.Length >= target.Length)
+                {
+                    if (Directory.Exists(check) && (File.GetAttributes(check) & FileAttributes.ReparsePoint) != 0) throw new IOException("Shell support paths cannot contain directory links.");
+                    if (check == target) break; check = Path.GetDirectoryName(check);
+                }
+                Directory.CreateDirectory(parent);
+                if(File.Exists(destination)&&(File.GetAttributes(destination)&FileAttributes.ReparsePoint)!=0)throw new IOException("Shell support files cannot be links.");
+                if (File.Exists(destination))
+                {
+                    using (var hash = SHA256.Create())
+                    using (var original = File.OpenRead(file))
+                    using (var installed = File.OpenRead(destination))
+                        if (Convert.ToBase64String(hash.ComputeHash(original)) == Convert.ToBase64String(hash.ComputeHash(installed))) continue;
+                }
+                // Native DLL names include their content hash, avoiding in-use
+                // DLL replacement. Identical already-installed files are retained.
+                File.Copy(file, destination, true);
             }
         }
 
@@ -305,155 +374,6 @@ namespace AgentPal.Installer
             return files.ToArray();
         }
 
-        private static string ClaudeDirectory
-        {
-            get
-            {
-                string configured = Environment.GetEnvironmentVariable("AGENT_PAL_CLAUDE_CONFIG_DIR");
-                if (String.IsNullOrWhiteSpace(configured))
-                    configured = Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR");
-                return String.IsNullOrWhiteSpace(configured)
-                    ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude")
-                    : Environment.ExpandEnvironmentVariables(configured);
-            }
-        }
-
-        private static void RegisterHooks()
-        {
-            Directory.CreateDirectory(ClaudeDirectory);
-            string settingsPath = Path.Combine(ClaudeDirectory, "settings.json");
-            JavaScriptSerializer serializer = new JavaScriptSerializer();
-            serializer.MaxJsonLength = Int32.MaxValue;
-            Dictionary<string, object> root = new Dictionary<string, object>();
-            if (File.Exists(settingsPath))
-            {
-                string json = File.ReadAllText(settingsPath);
-                if (!String.IsNullOrWhiteSpace(json))
-                    root = serializer.Deserialize<Dictionary<string, object>>(json);
-                string backup = settingsPath + ".orbit-backup";
-                File.Copy(settingsPath, backup, true);
-            }
-
-            Dictionary<string, object> hooks = GetOrCreateDictionary(root, "hooks");
-            string[] events = { "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest", "Notification", "MessageDisplay", "TaskCompleted", "Stop", "StopFailure", "SessionEnd" };
-            foreach (string eventName in events)
-            {
-                ArrayList groups = GetOrCreateList(hooks, eventName);
-                RemoveManagedHookGroups(groups);
-                Dictionary<string, object> handler = new Dictionary<string, object>();
-                handler["type"] = "command";
-                handler["command"] = BuildHookCommand(eventName);
-                handler["timeout"] = 5;
-                Dictionary<string, object> group = new Dictionary<string, object>();
-                if (eventName == "Notification")
-                    group["matcher"] = "permission_prompt|idle_prompt|agent_needs_input|elicitation_dialog";
-                group["hooks"] = new object[] { handler };
-                groups.Add(group);
-            }
-
-            WriteJsonAtomically(settingsPath, serializer.Serialize(root));
-        }
-
-        private static string BuildHookCommand(string eventName)
-        {
-            string forwardPath = PetExe.Replace('\\', '/').Replace("'", "''");
-            // Decode the redirected hook pipe explicitly. Native invocation
-            // alone can consume/reinterpret stdin or use the ANSI codepage.
-            // Claude executes this command through Bash, so avoid $ variables
-            // in the double-quoted bridge (Bash would expand them first).
-            string script = "$ProgressPreference='SilentlyContinue'; $OutputEncoding=New-Object Text.UTF8Encoding($false); " +
-                "$reader=New-Object IO.StreamReader([Console]::OpenStandardInput(),(New-Object Text.UTF8Encoding($false))); " +
-                "$json=$reader.ReadToEnd(); $json | & '" + forwardPath + "' --hook " + eventName;
-            string encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
-            // A hook inherits the caller's console. -WindowStyle Hidden can
-            // hide that existing CLI window; never change its window style.
-            return "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encoded;
-        }
-
-        private static Dictionary<string, object> GetOrCreateDictionary(Dictionary<string, object> parent, string name)
-        {
-            object value;
-            Dictionary<string, object> result;
-            if (parent.TryGetValue(name, out value) && (result = value as Dictionary<string, object>) != null) return result;
-            result = new Dictionary<string, object>();
-            parent[name] = result;
-            return result;
-        }
-
-        private static ArrayList GetOrCreateList(Dictionary<string, object> parent, string name)
-        {
-            object value;
-            ArrayList result;
-            if (parent.TryGetValue(name, out value) && (result = value as ArrayList) != null) return result;
-            object[] array = value as object[];
-            result = array == null ? new ArrayList() : new ArrayList(array);
-            parent[name] = result;
-            return result;
-        }
-
-        private static void RemoveManagedHookGroups(ArrayList groups)
-        {
-            for (int i = groups.Count - 1; i >= 0; i--)
-            {
-                IDictionary group = groups[i] as IDictionary;
-                if (group == null || !group.Contains("hooks")) continue;
-                IEnumerable handlers = group["hooks"] as IEnumerable;
-                if (handlers == null || group["hooks"] is string) continue;
-                ArrayList kept = new ArrayList();
-                bool changed = false;
-                foreach (object item in handlers)
-                {
-                    IDictionary handler = item as IDictionary;
-                    if (handler != null && handler.Contains("command") && IsPetHookCommand(Convert.ToString(handler["command"]))) changed = true;
-                    else kept.Add(item);
-                }
-                if (!changed) continue;
-                if (kept.Count == 0) groups.RemoveAt(i);
-                else group["hooks"] = kept.ToArray();
-            }
-        }
-
-        private static bool ContainsManagedHookCommand(object value)
-        {
-            IDictionary dictionary = value as IDictionary;
-            if (dictionary != null)
-            {
-                foreach (DictionaryEntry entry in dictionary)
-                {
-                    if (String.Equals(Convert.ToString(entry.Key), "command", StringComparison.OrdinalIgnoreCase) && IsPetHookCommand(Convert.ToString(entry.Value))) return true;
-                    if (ContainsManagedHookCommand(entry.Value)) return true;
-                }
-            }
-            IEnumerable sequence = value as IEnumerable;
-            if (sequence != null && !(value is string))
-                foreach (object item in sequence) if (ContainsManagedHookCommand(item)) return true;
-            return false;
-        }
-
-        private static bool IsPetHookCommand(string command)
-        {
-            string text = command ?? "";
-            System.Text.RegularExpressions.Match encoded = System.Text.RegularExpressions.Regex.Match(text, @"-EncodedCommand\s+([A-Za-z0-9+/=]+)\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (encoded.Success)
-            {
-                try { text = System.Text.Encoding.Unicode.GetString(Convert.FromBase64String(encoded.Groups[1].Value)); }
-                catch (FormatException) { return false; }
-            }
-            if (text.IndexOf("--hook ", StringComparison.OrdinalIgnoreCase) < 0) return false;
-            string normalized = text.Replace('\\', '/');
-            foreach (string executable in new[] { PetExe, Path.Combine(InstallDirectory, LegacyExe) })
-                if (normalized.IndexOf(executable.Replace('\\', '/').Replace("'", "''"), StringComparison.OrdinalIgnoreCase) >= 0) return true;
-            return false;
-        }
-
-        private static void WriteJsonAtomically(string path, string json)
-        {
-            string temporary = path + ".agent-pal-tmp";
-            File.WriteAllText(temporary, json, new System.Text.UTF8Encoding(false));
-            if (File.Exists(path)) File.Replace(temporary, path, null);
-            else File.Move(temporary, path);
-        }
-
         private static void RegisterStartup()
         {
             AgentPal.StartupRegistration.SetEnabled(true, PetExe);
@@ -466,11 +386,11 @@ namespace AgentPal.Installer
                 // Never touch the real Start menu from an isolated installer test.
                 string programs = TestMode ? Path.Combine(InstallDirectory, "test-start-menu") : Environment.GetFolderPath(Environment.SpecialFolder.Programs);
                 if (String.IsNullOrWhiteSpace(programs)) throw new InvalidOperationException("无法取得当前用户的开始菜单目录。");
-                return Path.Combine(programs, "agent-pal");
+                return Path.Combine(programs, AppName);
             }
         }
 
-        private static string StartMenuShortcut { get { return Path.Combine(StartMenuFolder, "agent-pal.lnk"); } }
+        private static string StartMenuShortcut { get { return Path.Combine(StartMenuFolder, "AgentPal.lnk"); } }
 
         // Keep these declarations in Win32 vtable order, including unused methods.
         [ComImport, Guid("000214F9-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -527,15 +447,19 @@ namespace AgentPal.Installer
                 shortcut = CreateShellLink();
                 shortcut.SetPath(PetExe);
                 shortcut.SetWorkingDirectory(InstallDirectory);
-                shortcut.SetDescription("agent-pal · 连接本机 Claude Code CLI");
+                shortcut.SetDescription("AgentPal · 连接本机 Claude Code CLI");
                 shortcut.SetShowCmd(1);
                 // Versioned file avoids reusing Explorer's stale transparent icon.
-                string icon = Path.Combine(InstallDirectory, "agent-pal-" + Version + ".ico");
+                string icon = Path.Combine(InstallDirectory, "agent-pal-brand-v2.ico");
                 shortcut.SetIconLocation(File.Exists(icon) ? icon : PetExe, 0);
                 ((IPersistFile)shortcut).Save(temporary, true);
                 Marshal.FinalReleaseComObject(shortcut); shortcut = null;
                 if (File.Exists(StartMenuShortcut)) File.Replace(temporary, StartMenuShortcut, null);
                 else File.Move(temporary, StartMenuShortcut);
+                string previousLink=Path.Combine(StartMenuFolder,"agent-pal.lnk");
+                if(File.Exists(previousLink)&&ShortcutBelongsToPet(previousLink,PetExe))File.Delete(previousLink);
+                previousLink=Path.Combine(Path.GetDirectoryName(StartMenuFolder),"agent-pal","agent-pal.lnk");
+                if(File.Exists(previousLink)&&ShortcutBelongsToPet(previousLink,PetExe))File.Delete(previousLink);
             }
             finally
             {
@@ -573,11 +497,14 @@ namespace AgentPal.Installer
                 key.SetValue("NoModify", 1, RegistryValueKind.DWord);
                 key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
             }
-            string legacyPath = InstallRegistry + "OrbitPet";
+            foreach(string previousName in new[]{StartupRegistration.PreviousPackageName,"OrbitPet"})
+            {
+            string legacyPath = InstallRegistry + previousName;
             bool sameInstallation;
             using (RegistryKey legacy = Registry.CurrentUser.OpenSubKey(legacyPath))
                 sameInstallation = legacy != null && String.Equals(legacy.GetValue("InstallLocation") as string, InstallDirectory, StringComparison.OrdinalIgnoreCase);
             if (sameInstallation) Registry.CurrentUser.DeleteSubKeyTree(legacyPath, false);
+            }
         }
 
         private static void StopPet()
@@ -597,20 +524,25 @@ namespace AgentPal.Installer
 
         private static void Uninstall()
         {
-            DialogResult answer = MessageBox.Show("确定卸载agent-pal，并移除 Claude Code 联动吗？", AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            DialogResult answer = MessageBox.Show("确定卸载 AgentPal 并移除启动项和快捷方式吗？", AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (answer != DialogResult.Yes) return;
             try
             {
                 ValidateInstallLocation(true);
                 StopPet();
-                RemoveHooks();
+                // Leave existing Claude settings and legacy hooks untouched.
                 RemoveStartMenuShortcut();
+                if(File.Exists(PetExe))
+                {
+                    using(Process cleanup=Process.Start(new ProcessStartInfo(PetExe,"--remove-quick-commands") {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden}))
+                        if(!cleanup.WaitForExit(10000)||cleanup.ExitCode!=0)throw new IOException("Unable to remove this installation's folder context menus.");
+                }
                 AgentPal.StartupRegistration.SetEnabled(false, PetExe);
                 Registry.CurrentUser.DeleteSubKeyTree(InstallRegistry + AppName, false);
                 // Do not recursively delete a user-writable install tree. It may
                 // contain user documents, old asset backups, or directory links.
                 // Remove integration only and let the user review remaining files.
-                MessageBox.Show("已移除开机启动、快捷方式及本安装的 Claude Code 联动。\n为保留可能存在的用户文件，程序目录未自动删除，可在关闭本窗口后自行清理：\n" + InstallDirectory, AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("已移除开机启动和快捷方式；Claude 配置保持原样。\n为保留可能存在的用户文件，程序目录未自动删除，可在关闭本窗口后自行清理：\n" + InstallDirectory, AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -639,25 +571,6 @@ namespace AgentPal.Installer
                 throw new InvalidOperationException("此目录不属于本应用，请选择一个空目录。");
         }
 
-        private static void RemoveHooks()
-        {
-            string path = Path.Combine(ClaudeDirectory, "settings.json");
-            if (!File.Exists(path)) return;
-            JavaScriptSerializer serializer = new JavaScriptSerializer();
-            serializer.MaxJsonLength = Int32.MaxValue;
-            Dictionary<string, object> root = serializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(path));
-            object hooksObject;
-            Dictionary<string, object> hooks;
-            if (!root.TryGetValue("hooks", out hooksObject) || (hooks = hooksObject as Dictionary<string, object>) == null) return;
-            foreach (string key in new List<string>(hooks.Keys))
-            {
-                ArrayList groups = GetOrCreateList(hooks, key);
-                RemoveManagedHookGroups(groups);
-                if (groups.Count == 0) hooks.Remove(key);
-            }
-            if (hooks.Count == 0) root.Remove("hooks");
-            WriteJsonAtomically(path, serializer.Serialize(root));
-        }
     }
 
 }

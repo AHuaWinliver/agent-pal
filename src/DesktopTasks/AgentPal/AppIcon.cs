@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -20,10 +20,34 @@ namespace AgentPal
                 {
                     string version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
                     string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "agent-pal-" + version + ".ico");
-                    if (File.Exists(path)) windowIcon = new Icon(path, new Size(32, 32));
+                    string brand = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "agent-pal-brand-v2.ico");
+                    if (File.Exists(brand)) windowIcon = new Icon(brand, new Size(32, 32));
+                    else if (File.Exists(path)) windowIcon = new Icon(path, new Size(32, 32));
                     else windowIcon = Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
                 }
                 return windowIcon;
+            }
+        }
+
+        // Product identity is independent of the selected character. The approved
+        // master is resampled as a complete mark, not cropped into a portrait.
+        internal static Bitmap CreateBrandBitmap(Image master, int size)
+        {
+            if(master==null)throw new ArgumentNullException("master");
+            if(size<16||size>1024)throw new ArgumentOutOfRangeException("size");
+            using(var large=new Bitmap(size*4,size*4,PixelFormat.Format32bppArgb))
+            {
+                using(var graphics=Graphics.FromImage(large))
+                {
+                    graphics.Clear(Color.Transparent);graphics.SmoothingMode=SmoothingMode.AntiAlias;
+                    graphics.InterpolationMode=InterpolationMode.HighQualityBicubic;
+                    // Preserve the approved artwork's own rounded silhouette.
+                    // Its black badge stays visible; only the exterior corners are transparent.
+                    graphics.DrawImage(master,new Rectangle(0,0,large.Width,large.Height));
+                }
+                var result=new Bitmap(size,size,PixelFormat.Format32bppArgb);
+                using(var graphics=Graphics.FromImage(result)){graphics.Clear(Color.Transparent);graphics.InterpolationMode=InterpolationMode.HighQualityBicubic;graphics.DrawImage(large,new Rectangle(0,0,size,size));}
+                return result;
             }
         }
 

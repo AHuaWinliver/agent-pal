@@ -26,11 +26,16 @@ namespace AgentPal
         private string messageId = "";
         private bool hasText;
         private bool lineOpen;
+        private bool separateBoundary;
+        public bool IncludeToolOutput = true;
+        public event Action<string> Process;
         public string Status { get; private set; }
         public string SessionId { get; private set; }
         public string Reaction { get; private set; }
+        public bool HasResultError { get; private set; }
+        public string FailureKind { get; private set; }
 
-        public ClaudeTaskStreamRenderer() { Status = "Claude 正在连接…"; Reaction = "UserPromptSubmit"; SessionId = ""; }
+        public ClaudeTaskStreamRenderer() { Status = "Claude 正在连接…"; Reaction = "UserPromptSubmit"; SessionId = ""; FailureKind = ""; }
 
         public string Consume(string line)
         {
@@ -42,6 +47,9 @@ namespace AgentPal
             string session = Text(root, "session_id");
             if (session.Length != 0) SessionId = session;
             string type = Text(root, "type");
+            CliFailureNotice notice=CliFailureNotice.FromEvent(root);
+            if(notice!=null&&type!="result")
+            {Status=notice.Text;Reaction=notice.Retrying?"UserPromptSubmit":"StopFailure";if(!notice.Retrying){HasResultError=true;FailureKind=notice.Kind;}return Line((notice.Retrying?"[重试] ":"[执行失败] ")+notice.Text);}
             if (type == "system")
             {
                 if (Text(root, "subtype") == "init") { Status = "Claude CLI 已连接，正在处理…"; return Line("[已连接] Claude Code"); }
@@ -74,7 +82,7 @@ namespace AgentPal
                     streamedBlocks[blockKey] = (old ?? "") + fragment;
                     textByMessage.TryGetValue(messageId, out old);
                     textByMessage[messageId] = (old ?? "") + fragment;
-                    hasText = true; lineOpen = true; return fragment;
+                    hasText = true; return TextFragment(fragment);
                 }
                 if (Text(delta, "type") == "input_json_delta" && inputs.ContainsKey(index)) inputs[index].Append(Text(delta, "partial_json"));
                 if (eventType == "content_block_stop" && inputs.ContainsKey(index))
@@ -105,7 +113,7 @@ namespace AgentPal
                     // Partial streaming events and full assistant messages are
                     // alternate representations of the same reply, not two replies.
                     string remainder = String.IsNullOrEmpty(rendered) ? text : (text.StartsWith(rendered, StringComparison.Ordinal) ? text.Substring(rendered.Length) : text);
-                    if (remainder.Length > 0) { output.Append(remainder); lineOpen = true; hasText = true; }
+                    if (remainder.Length > 0) { output.Append(TextFragment(remainder)); hasText = true; }
                     textByMessage[id] = (rendered ?? "") + remainder;
                 }
                 return output.ToString();
@@ -120,18 +128,21 @@ namespace AgentPal
                         Status = error ? "Claude 工具执行失败" : "Claude 工具已返回，继续处理…";
                         Reaction = error ? "PostToolUseFailure" : "PostToolUse";
                         object content; block.TryGetValue("content", out content);
-                        output.Append(Line((error ? "[工具失败] " : "[工具结果] ") + UiText.TailCodeUnits(PlainContent(content), 2400)));
+                        string rendered=Line((error ? "[工具失败] " : "[工具结果] ") + UiText.TailCodeUnits(PlainContent(content), IncludeToolOutput?2400:900));
+                        if(IncludeToolOutput)output.Append(rendered);else ReportProcess(rendered);
                     }
                 return output.ToString();
             }
             if (type == "tool_progress") { Status = "Claude 正在执行工具：" + Text(root, "tool_name"); Reaction = "PreToolUse"; return ""; }
             if (type == "result")
             {
-                string output = !hasText ? Line(Text(root, "result")) : "";
                 bool failed = Text(root, "is_error").Equals("True", StringComparison.OrdinalIgnoreCase);
+                HasResultError = failed;
+                string output = failed || !hasText ? Line(Text(root, "result")) : "";
                 Status = failed ? "Claude 本轮执行失败" : "Claude 已完成回复";
                 Reaction = failed ? "StopFailure" : "Stop";
                 object errors; if (root.TryGetValue("errors", out errors)) output += Line("[执行失败] " + PlainContent(errors));
+                if (failed) FailureKind = SectPromptPolicy.Classify(Text(root, "result") + "\n" + output);
                 object denials;
                 if (root.TryGetValue("permission_denials", out denials) && denials is ICollection && ((ICollection)denials).Count > 0)
                 { Status = "Claude 有工具权限未获批准"; Reaction = "PermissionRequest"; output += Line("[权限受限] 部分工具未获批准，请检查本机 Claude Code 的权限设置。"); }
@@ -153,12 +164,15 @@ namespace AgentPal
                     if (value.Length > 0 && toolDetails.Add(id + ":" + key)) output += Line("  " + key + ": " + UiText.TailCodeUnits(value, 1000));
                 }
             }
+            if(!IncludeToolOutput){ReportProcess(output);return "";}
             return output;
         }
+        private void ReportProcess(string text){if(text.Length==0)return;separateBoundary=true;if(Process!=null)Process(UiText.TailCodeUnits(text,2400));}
+        private string TextFragment(string text){if(text.Length==0)return text;string prefix=separateBoundary?Environment.NewLine+Environment.NewLine:"";separateBoundary=false;lineOpen=true;return prefix+text;}
         private string Line(string text)
         {
             if (String.IsNullOrEmpty(text)) return "";
-            string prefix = lineOpen ? Environment.NewLine : ""; lineOpen = false;
+            string prefix = lineOpen||separateBoundary ? Environment.NewLine : ""; lineOpen = false;separateBoundary=false;
             return prefix + UiText.Normalize(text) + Environment.NewLine;
         }
         private static Dictionary<string, object> Map(Dictionary<string, object> parent, string key)

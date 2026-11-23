@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -212,6 +212,7 @@ namespace AgentPal
             Rectangle area = Screen.PrimaryScreen.WorkingArea;
             defaultLocation = new Point(area.Right - Width - 32, area.Bottom - Height - 24);
             LoadPreferences();
+            UiMotion.ReducedMotion=reduceMotion;
             BuildTrayMenu();
             BuildClickActionsMenu();
             InitializeDesktopVisibility();
@@ -219,11 +220,13 @@ namespace AgentPal
             promptForm.PromptSubmitted += RunClaudePrompt;
             promptForm.ActivityRequested += ShowActivities;
             promptForm.ReminderRequested += ShowReminderSettings;
+            promptForm.HistoryTodayRequested += delegate { promptForm.Hide(); StartPetBrainInteraction("history-today", 0); };
             activityTray.ActivityViewed += ApplyActivityPriority;
             activityTray.ReplySubmitted += RunClaudeReply;
             InitializeChatGroupDrag();
             replyBubble.ConversationRequested += OpenReplyConversation;
             reminderService.ReminderDue += QueueReminder;
+            reminderService.PreviewRequested += ShowReminder;
             claudeTaskService.TaskDue += QueueScheduledClaudeTask;
             claudeRunner.SessionIdentified += delegate(string sessionId)
             {
@@ -251,6 +254,7 @@ namespace AgentPal
                     if (!replyBubble.Visible && !replyBubble.UserDismissed) ShowReplyBubble();
                     if (currentActivity != null)
                     {
+                        currentActivity.StatusDetail=null;
                         currentActivity.AppendOutput(text);
                         currentActivity.Updated = DateTime.Now;
                         RefreshActivities();
@@ -265,8 +269,37 @@ namespace AgentPal
                         ? PetCharacter.Find(currentCharacterId).Name + " 正在整理今天的重要事件…"
                         : (brainRequestReason == "break" ? PetCharacter.Find(currentCharacterId).Name + " 正在准备休息提醒…" : PetCharacter.Find(currentCharacterId).Name + " 正在组织想说的话…");
                     replyBubble.SetStatus(brainRequestActive ? brainStatus : text);
-                    if (claudeRunner.IsRunning) ShowReplyBubble();
-                    if (currentActivity != null) { currentActivity.State = "正在运行"; currentActivity.Updated = DateTime.Now; RefreshActivities(); }
+                    if(currentActivity!=null)currentActivity.AppendProcess(text);
+                    if (currentActivity != null) { if(String.IsNullOrEmpty(currentActivity.StatusDetail))currentActivity.State = "正在运行"; currentActivity.Updated = DateTime.Now; RefreshActivities(); }
+                });
+            };
+            claudeRunner.ProcessReceived += delegate(string text)
+            {
+                RunOnUi(delegate
+                {
+                    replyBubble.AppendProcess(text);
+                    if(currentActivity!=null){currentActivity.AppendProcess(text);RefreshActivities();}
+                });
+            };
+            claudeRunner.DiagnosticReceived += delegate(string text)
+            {
+                RunOnUi(delegate
+                {
+                    if (currentActivity == null) return;
+                    currentActivity.AppendProcess(text);
+                    replyBubble.AppendProcess(text);
+                    currentActivity.Output = UiText.TailCodeUnits((currentActivity.Output ?? "") + UiText.Normalize(text), 120000);
+                    currentActivity.Updated = DateTime.Now;
+                    RefreshActivities();
+                });
+            };
+            claudeRunner.NoticeReceived += delegate(string text,bool retrying)
+            {
+                RunOnUi(delegate
+                {
+                    string notice=UiLanguage.Text(retrying?"连接异常，正在重试":"执行失败")+"\n"+text;
+                    replyBubble.SetStatus(notice);replyBubble.AppendProcess(notice);
+                    if(currentActivity!=null){currentActivity.StatusDetail=notice;currentActivity.State=retrying?"正在运行":"受阻";currentActivity.AppendProcess(notice);currentActivity.Updated=DateTime.Now;RefreshActivities();}
                 });
             };
             claudeRunner.Completed += delegate(int code)
@@ -280,15 +313,18 @@ namespace AgentPal
                         return;
                     }
                     replyBubble.FlushPendingReply();
-                    if (code == 0)
+                    if (code == 0 && String.IsNullOrEmpty(claudeRunner.FailureKind))
                     {
+                        if(currentActivity!=null)currentActivity.StatusDetail=null;
                         replyBubble.SetStatus("Claude 已完成");
                         CompleteCurrentActivity("就绪");
                         SetClaudeEvent("Stop");
                     }
                     else
                     {
-                        replyBubble.SetStatus("Claude CLI 已退出，代码 " + code.ToString());
+                        string failed=UiLanguage.Text("执行失败")+" · "+(currentActivity!=null&&!String.IsNullOrEmpty(currentActivity.StatusDetail)?currentActivity.StatusDetail:"Claude CLI exit "+code.ToString());
+                        replyBubble.SetStatus(failed);
+                        if(currentActivity!=null&&String.IsNullOrEmpty(currentActivity.StatusDetail))currentActivity.StatusDetail=failed;
                         CompleteCurrentActivity("受阻");
                         SetClaudeEvent("StopFailure");
                     }
@@ -352,6 +388,7 @@ namespace AgentPal
                     if (!Directory.Exists(stateRoot) || Directory.GetFiles(stateRoot, "*.png").Length != expectedFrames) return false;
                 }
             }
+            try{DefaultCompanionCatalog.ReadProfiles(root);}catch{return false;}
             return true;
         }
 
@@ -373,26 +410,32 @@ namespace AgentPal
         private void RenderCurrentFrame()
         {
             if (animations.Count == 0) return;
-            if(TryRenderArtifactTravel())return;
+            bool editing = interactionPaused && !dragging;
+            if(!editing && TryRenderArtifactTravel())return;
             List<Image> frames;
-            if (!animations.TryGetValue(state, out frames) || frames.Count == 0)
-                frames = animations["idle"];
-            if (TryPushWalkingExpression(frames[frameIndex % frames.Count])) return;
+            string cacheState = editing ? "idle" : state;
+            if (!animations.TryGetValue(cacheState, out frames) || frames.Count == 0)
+            {
+                cacheState = "idle";
+                frames = animations[cacheState];
+            }
+            int displayFrame = editing ? 0 : frameIndex;
+            if (!editing && TryPushWalkingExpression(frames[displayFrame % frames.Count])) return;
             List<IntPtr> cached;
-            string cacheState = animations.ContainsKey(state) ? state : "idle";
             if (cachedCanvasSize == ClientSize && layeredFrameCache.TryGetValue(cacheState, out cached) && cached.Count == frames.Count && cached.Count > 0)
             {
-                int index = frameIndex % cached.Count;
+                int index = displayFrame % cached.Count;
                 if (cached[index] == IntPtr.Zero)
                     using (Bitmap surface = RenderSpriteBitmap(frames[index], ClientSize)) cached[index] = surface.GetHbitmap(Color.FromArgb(0));
                 PushLayeredHandle(cached[index], ClientSize);
                 return;
             }
-            using (Bitmap surface = RenderSpriteBitmap(frames[frameIndex % frames.Count], ClientSize)) PushLayeredBitmap(surface);
+            using (Bitmap surface = RenderSpriteBitmap(frames[displayFrame % frames.Count], ClientSize)) PushLayeredBitmap(surface);
         }
 
         private void RefreshPetVisual()
         {
+            SyncConversationOpacity();
             // Per-pixel-alpha layered windows are not repainted reliably by Invalidate().
             // Submit every animation frame explicitly so movement and pose stay in sync.
             if (IsHandleCreated && !IsDisposed)
@@ -662,10 +705,9 @@ namespace AgentPal
 
         private void LoadAnimations()
         {
-            string root = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets");
-            if (Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") == "1") root = Environment.GetEnvironmentVariable("AGENT_PAL_TEST_ASSETS") ?? root;
+            string root = PetCharacter.AssetsRoot;
             if (!ValidateAssets(Path.GetDirectoryName(root)))
-                throw new InvalidOperationException("宠物动画资源不完整，请重新安装。\n" + root);
+                throw new InvalidOperationException("伙伴动画资源不完整，请重新安装。\n" + root);
             LoadCharacterAnimations(currentCharacterId);
         }
 
@@ -674,10 +716,11 @@ namespace AgentPal
             PetCharacter character = PetCharacter.Find(characterId);
             CharacterAnimationSet incoming = prepared ?? new CharacterAnimationSet();
             var expressions = new Dictionary<int, Image>();
+            float[] expressionAttachment=null;
             Dictionary<string, List<IntPtr>> handles = null;
             try
             {
-                if (character.IsExternal)
+                if (character.UsesPackFrames)
                 {
                     if (prepared == null)
                     {
@@ -689,7 +732,7 @@ namespace AgentPal
                 else
                 {
                     string root = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets");
-                    if (Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") == "1") root = Environment.GetEnvironmentVariable("AGENT_PAL_TEST_ASSETS") ?? root;
+                    root = PetCharacter.AssetsRoot;
                     if (character.Id != "orbit") root = Path.Combine(root, "characters", character.Id);
                     foreach (string name in CharacterPackCatalog.States)
                     {
@@ -698,10 +741,11 @@ namespace AgentPal
                         foreach (string file in files) frames.Add(LoadDetachedImage(file));
                     }
                     for (int i = 1; i <= 6; i++) expressions.Add(i, LoadDetachedImage(Path.Combine(root, "profile-expressions", i.ToString("00") + ".png")));
+                    expressionAttachment=ReadWalkingExpressionAttachment(Path.Combine(root,"profile-expressions","attachment.json"));
                 }
                 // Stage all resources before releasing the live character. External
                 // native frame handles are filled lazily to avoid blocking the UI.
-                handles = CreateLayeredFrameCache(incoming.Frames, character.IsExternal);
+                handles = CreateLayeredFrameCache(incoming.Frames, character.UsesPackFrames);
                 DisposeWalkingExpressions(); DisposeLayeredFrameCache();
                 foreach (List<Image> existing in animations.Values) foreach (Image image in existing) image.Dispose();
                 animations.Clear();
@@ -709,7 +753,8 @@ namespace AgentPal
                 incoming.Frames.Clear();
                 foreach (var pair in handles) layeredFrameCache.Add(pair.Key, pair.Value);
                 handles = null; cachedCanvasSize = ClientSize;
-                AdoptWalkingExpressions(expressions, character.Id); expressions.Clear();
+                AdoptWalkingExpressions(expressions, character.Id, expressionAttachment); expressions.Clear();
+                AdoptFlightArtwork(character, incoming);
                 loadedCharacterRevision = character.ResourceRevision ?? "";
             }
             finally
@@ -740,7 +785,7 @@ namespace AgentPal
         private void RebuildLayeredFrameCache()
         {
             if (ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
-            var staged = CreateLayeredFrameCache(animations, PetCharacter.Find(currentCharacterId).IsExternal);
+            var staged = CreateLayeredFrameCache(animations, PetCharacter.Find(currentCharacterId).UsesPackFrames);
             DisposeLayeredFrameCache(); cachedCanvasSize = ClientSize;
             foreach (var pair in staged) layeredFrameCache.Add(pair.Key, pair.Value);
         }
@@ -841,22 +886,21 @@ namespace AgentPal
             activity.Click += delegate { ShowActivities(); };
             menu.Items.Add(activity);
 
-            ToolStripMenuItem historyToday = new ToolStripMenuItem("历史上的今天");
-            historyToday.Click += delegate { StartPetBrainInteraction("history-today", 0); };
-            menu.Items.Add(historyToday);
-
-            ToolStripMenuItem reminders = new ToolStripMenuItem("提醒与倒计时…");
+            ToolStripMenuItem reminders = new ToolStripMenuItem("提醒与倒计时");
             reminders.Click += delegate { ShowReminderSettings(); };
             menu.Items.Add(reminders);
 
-            ToolStripMenuItem scheduledTasks = new ToolStripMenuItem("Claude Code 定时任务…");
+            ToolStripMenuItem scheduledTasks = new ToolStripMenuItem("定时任务");
             scheduledTasks.Click += delegate { ShowClaudeTaskSettings(); };
             menu.Items.Add(scheduledTasks);
-            var workshop = new ToolStripMenuItem("事件规划 / 门派协作…");
+            var workshop = new ToolStripMenuItem("事件规划 / Agent 协作");
             workshop.Click += delegate { ShowWorkshop(); }; menu.Items.Add(workshop);
             menu.Items.Add(new ToolStripSeparator());
 
             menu.Items.Add(BuildCharacterMenu(true));
+            var manageCompanions=new ToolStripMenuItem(UiLanguage.Text("伙伴管理")){Name="CompanionManager"};
+            manageCompanions.Click+=delegate{BeginInvoke((MethodInvoker)ShowCompanionManager);};menu.Items.Add(manageCompanions);
+            AddQuickSettings(menu);
 
             pauseItem = new ToolStripMenuItem("暂停 Claude 联动");
             pauseItem.Click += delegate
@@ -868,32 +912,23 @@ namespace AgentPal
             };
             menu.Items.Add(pauseItem);
 
-            var defaults = new ToolStripMenuItem(UiLanguage.Text("Default settings"));
+            var defaults = new ToolStripMenuItem(UiLanguage.Text("Default settings")){Name="DefaultSettings"};
             defaults.Click += delegate { ShowDefaultSettings(); };
-            ToolStripMenuItem openClaude = new ToolStripMenuItem("在 PowerShell 打开 Claude Code CLI");
-            openClaude.Click += delegate { OpenClaudeCli(promptForm.WorkingDirectory); };
-            menu.Items.Add(openClaude);
-            menu.Items.Add(defaults);
             menu.Items.Add(new ToolStripSeparator());
 
-            showPetItem = new ToolStripMenuItem("显示宠物");
-            showPetItem.Click += delegate { ShowPet(); };
-            menu.Items.Add(showPetItem);
-            hidePetItem = new ToolStripMenuItem("隐藏宠物");
-            hidePetItem.Click += delegate { HidePet(); };
-            menu.Items.Add(hidePetItem);
+            visibilityItem = new ToolStripMenuItem("隐藏伙伴"){Name="TogglePetVisibility"};
+            visibilityItem.Click += delegate {if(userHidden)ShowPet();else HidePet();};
+            menu.Items.Add(visibilityItem);
 
-            ToolStripMenuItem about = new ToolStripMenuItem("关于桌面宠物");
-            about.Click += delegate
-            {
-                string version = typeof(Program).Assembly.GetName().Version.ToString(3);
-                MessageBox.Show("agent-pal " + version + "\n\n青衡、绯笺、苍芷、小墨 · 国风原创形象\n透明分层动画 · Claude Code · 提醒与定时任务\n代码采用 Apache-2.0；素材来源及授权范围见 ASSET-LICENSE.md。\n本项目与任何模型厂商或影视作品无隶属关系。", "关于agent-pal", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            };
+            ToolStripMenuItem about = new ToolStripMenuItem("关于 AgentPal");
+            about.Click += delegate { using(var window=new AboutForm())window.ShowDialog(this); };
             menu.Items.Add(about);
 
             ToolStripMenuItem exit = new ToolStripMenuItem("退出");
             exit.Click += delegate { Close(); };
             menu.Items.Add(exit);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(defaults);
 
             tray.Text = Program.ProductName;
             tray.ContextMenuStrip = menu;
@@ -902,7 +937,20 @@ namespace AgentPal
             menu.Opening += delegate { replyBubble.Dismiss(); quoteBubble.Hide(); UpdateVisibilityMenu(); };
             tray.Visible = true;
             RefreshTrayIcon();
-            tray.DoubleClick += delegate { ShowQuickChat(); };
+            tray.MouseClick += TrayMouseClick;
+            tray.DoubleClick += delegate { menu.Close(); ShowQuickChat(); };
+        }
+
+        private void TrayMouseClick(object sender, MouseEventArgs e)
+        {
+            if(e.Button!=MouseButtons.Left||tray.ContextMenuStrip==null)return;
+            var menu=tray.ContextMenuStrip;
+            if(menu.Visible){menu.Close();return;}
+            // Use the same foreground-owner and taskbar-overlap path as the
+            // framework's right click. Showing the strip alone can dismiss it
+            // immediately after the companion's own window has been hidden.
+            var show=typeof(NotifyIcon).GetMethod("ShowContextMenu",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic);
+            if(show!=null)show.Invoke(tray,null);else menu.Show(Cursor.Position);
         }
 
         private void BuildClickActionsMenu()
@@ -940,7 +988,7 @@ namespace AgentPal
             ToolStripMenuItem historyToday = new ToolStripMenuItem("历史上的今天");
             historyToday.Click += delegate { StartPetBrainInteraction("history-today", 0); };
             clickActionsMenu.Items.Add(historyToday);
-            ToolStripMenuItem scheduledTasks = new ToolStripMenuItem("Claude Code 定时任务…");
+            ToolStripMenuItem scheduledTasks = new ToolStripMenuItem("定时任务");
             scheduledTasks.Click += delegate { ShowClaudeTaskSettings(); };
             clickActionsMenu.Items.Add(scheduledTasks);
             clickActionsMenu.Items.Add(new ToolStripSeparator());
@@ -1046,7 +1094,7 @@ namespace AgentPal
 
         private ToolStripMenuItem BuildCharacterMenu(bool trackItems = false)
         {
-            ToolStripMenuItem menu = new ToolStripMenuItem("切换形象");
+            ToolStripMenuItem menu = new ToolStripMenuItem(UiLanguage.Text("切换伙伴"));
             menu.DropDownOpening += delegate { PopulateCharacterMenu(menu, trackItems); };
             PopulateCharacterMenu(menu, trackItems);
             return menu;
@@ -1068,6 +1116,13 @@ namespace AgentPal
                 menu.DropDownItems.Add(item);
             }
             menu.DropDownItems.Add(new ToolStripSeparator());
+            var import = new ToolStripMenuItem(UiLanguage.Text("导入角色包…")) { Name = "importCharacterPack" };
+            import.Click += delegate { BeginInvoke((MethodInvoker)OpenCharacterPackImport); };
+            menu.DropDownItems.Add(import);
+            var create = new ToolStripMenuItem(UiLanguage.Text("从图片创建…")) { Name = "createCharacterFromImages" };
+            create.Click += delegate { BeginInvoke((MethodInvoker)OpenImageCharacterWizard); };
+            menu.DropDownItems.Add(create);
+            menu.DropDownItems.Add(BuildFlightArtworkMenu());
             var open = new ToolStripMenuItem(UiLanguage.Text("打开角色资源目录")) { Name = "openCharacterPackFolder" };
             open.Click += delegate { OpenCharacterPackDirectory(); };
             menu.DropDownItems.Add(open);
@@ -1078,7 +1133,7 @@ namespace AgentPal
 
         private void ShowRandomQuote()
         {
-            if (userHidden || !Visible || !petOnSelectedDesktop || reminderOverlay != null) return;
+            if (IsEditingInteraction() || userHidden || !Visible || !petOnSelectedDesktop || reminderOverlay != null) return;
             string[] quotes = PetCharacter.Find(currentCharacterId).Quotes;
             if (quotes.Length == 0) return;
             quoteBubble.ShowQuote(quotes[random.Next(quotes.Length)], Bounds);
@@ -1087,6 +1142,8 @@ namespace AgentPal
         private void TickAnimation(object sender, EventArgs e)
         {
             PollClaudeEvent();
+            if (PauseForEditing()) return;
+            if (reminderOverlay == null && reminderQueue.Count > 0) ShowNextReminder();
             CheckAiCare();
             if (userHidden || !petOnSelectedDesktop || reminderOverlay != null) { lastAnimationTick = DateTime.UtcNow; return; }
             DateTime animationNow = DateTime.UtcNow;
@@ -1120,7 +1177,7 @@ namespace AgentPal
                     ? SmoothInteractionFrameIntervalMs : AnimationFrameIntervalMs;
                 // A complete raise / gesture / lower cycle needs readable time;
                 // do not play the new full-range paths as a 384ms twitch loop.
-                frameInterval = CompanionMotion.GesturePlaybackInterval(currentCharacterId,state,frameInterval);
+                frameInterval = CompanionMotion.GesturePlaybackInterval(currentCharacterId,state,frameInterval,animations[state].Count,frameIndex);
                 frameAdvances = Math.Min(8, (int)(animationAccumulatorMs / frameInterval));
                 if (frameAdvances > 0) animationAccumulatorMs -= frameAdvances * frameInterval;
             }
@@ -1201,6 +1258,8 @@ namespace AgentPal
                     if (metadata.TryGetValue("session_id", out value)) sessionId = Convert.ToString(value);
                     if (metadata.TryGetValue("cwd", out value)) cwd = Convert.ToString(value);
                     if (metadata.TryGetValue("delta", out value)) delta = Convert.ToString(value);
+                    if(eventName=="StopFailure"&&String.IsNullOrWhiteSpace(delta))
+                    {if(metadata.TryGetValue("error_details",out value)||metadata.TryGetValue("error",out value))delta=Convert.ToString(value);}
                     if (metadata.TryGetValue("pet_managed", out value)) managed = String.Equals(Convert.ToString(value), "True", StringComparison.OrdinalIgnoreCase);
                 }
                 if (!String.Equals(eventName, "Show", StringComparison.OrdinalIgnoreCase) && !managed && !integrationPreferences.MonitorExternalSessions) return;
@@ -1276,6 +1335,12 @@ namespace AgentPal
                     break;
                 case "StopFailure":
                     claudeBusy = false;
+                    if(externalTracked)
+                    {
+                        ActivityRecord failed=activities.Find(item=>item.SessionId==sessionId);
+                        string notice=UiLanguage.Text("执行失败")+(String.IsNullOrWhiteSpace(delta)?"":"\n"+UiText.TailCodeUnits(delta,1600));
+                        if(failed!=null){failed.StatusDetail=notice;failed.AppendProcess(notice);RefreshActivities();}replyBubble.SetStatus(notice);
+                    }
                     SetTemporaryState("failed", 4500, "idle");
                     SetTrayText("Claude 本轮执行失败");
                     break;
@@ -1368,7 +1433,7 @@ namespace AgentPal
 
         private bool CanWander()
         {
-            return !userHidden && Visible && petOnSelectedDesktop && String.IsNullOrEmpty(dockedEdge) && (playfulRun || !hovering) && !dragging && !claudeBusy && !promptForm.Visible && !activityTray.Visible && !reminderForm.Visible && reminderOverlay == null && fileEatOverlay == null;
+            return !userHidden && Visible && petOnSelectedDesktop && String.IsNullOrEmpty(dockedEdge) && (playfulRun || !hovering) && !dragging && !claudeBusy && !IsEditingInteraction() && reminderOverlay == null && fileEatOverlay == null;
         }
 
         private void StartRandomWander()
@@ -1546,7 +1611,7 @@ namespace AgentPal
             StartupRegistration.SetEnabled(enabled, ExecutablePath);
         }
 
-        internal static ProcessStartInfo BuildTerminalStartInfo(string workingDirectory, string characterId = null)
+        internal static ProcessStartInfo BuildTerminalStartInfo(string workingDirectory, string characterId = null,string taskFile=null)
         {
             string directory = Directory.Exists(workingDirectory)
                 ? workingDirectory
@@ -1555,9 +1620,17 @@ namespace AgentPal
             string settingsPath = ClaudeSettingsFile.CurrentPath(characterId);
             string command = ClaudeCliRunner.FindClaudeCommand(characterId) ?? "claude";
             string invoke = "& '" + command.Replace("'", "''") + "'";
+            string quickSetup="";
+            if(taskFile!=null)
+            {
+                // Keep arbitrary user text out of cmd/batch command-line reparsing.
+                quickSetup="$env:AGENT_PAL_QUICK_TASK_FILE='"+taskFile.Replace("'","''")+"'; $agentPalInitialTask='Read the UTF-8 JSON file whose absolute path is in AGENT_PAL_QUICK_TASK_FILE. Execute its Task as the initial user request in the current working directory. Preserve existing user changes and retain the request file.'; ";
+                invoke+=" $agentPalInitialTask";
+            }
             string script = "$env:AGENT_PAL_PET_MANAGED_SESSION='1'; $utf8=New-Object Text.UTF8Encoding($false); $OutputEncoding=$utf8; [Console]::InputEncoding=$utf8; [Console]::OutputEncoding=$utf8; Set-Location -LiteralPath '" + literalDirectory + "'; " +
+                quickSetup+
                 ClaudeSettingsFile.PowerShellSetup(settingsPath, command) +
-                (settingsPath.Length == 0 ? invoke : "try { " + invoke + " --settings $agentPalSettings } finally { Remove-Item Env:AGENT_PAL_PET_SETTINGS_FILE -ErrorAction SilentlyContinue }");
+                (settingsPath.Length == 0 ? invoke : "try { " + invoke + " --settings $agentPalSettings } finally { if(Test-Path Env:AGENT_PAL_PET_SETTINGS_FILE){Remove-Item Env:AGENT_PAL_PET_SETTINGS_FILE} }");
             return new ProcessStartInfo("powershell.exe", "-NoLogo -NoExit -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script)))
             {
                 WorkingDirectory = directory,
@@ -1794,7 +1867,7 @@ namespace AgentPal
 
         private void StartPlayfulRun()
         {
-            if (claudeBusy || paused || reminderOverlay != null) return;
+            if (claudeBusy || paused || reminderOverlay != null || IsEditingInteraction()) return;
             artifactTravel.Reset();
             ReleaseEdgeDock();
             wanderPath.Clear();
@@ -1895,7 +1968,7 @@ namespace AgentPal
         internal bool ValidateTrailOverlay()
         {
             Rectangle screen = Screen.PrimaryScreen.Bounds;
-            trailOverlay.Configure(PetBrain.DefaultColors(currentCharacterId), "rainbow", 0.40f);
+            trailOverlay.Configure(CompanionAppearance.Colors(currentCharacterId), "rainbow", 0.40f);
             trailOverlay.Begin(screen);
             Point first = new Point(screen.Left + 80, screen.Top + 80);
             trailOverlay.AddPoint(first, screen);
@@ -1908,7 +1981,7 @@ namespace AgentPal
         {
             hovering = true;
             CancelWander();
-            if (!claudeBusy && !paused)
+            if (!claudeBusy && !paused && !IsEditingInteraction())
             {
                 string hoverAction = random.Next(2) == 0 ? "waving" : "review";
                 SetTemporaryState(hoverAction, hoverAction == "waving" ? 1800 : 1500, "idle");
@@ -1939,22 +2012,9 @@ namespace AgentPal
             brainResponse.Length = 0;
             brainRequestActive = true;
             bool historyToday = brainRequestReason == "history-today";
-            string title = brainRequestReason == "break" ? character.Name + " 休息提醒" : (historyToday ? character.Name + " 历史上的今天" : character.Name + " 主动发言");
-            currentActivity = new ActivityRecord
-            {
-                Title = title,
-                CharacterId = character.Id,
-                WorkingDirectory = promptForm.WorkingDirectory,
-                State = "正在运行",
-                Output = brainRequestReason == "doubleclick"
-                    ? "双击唤醒了 " + character.Name + " 的 AI 大脑。\r\n\r\n"
-                    : (brainRequestReason == "break" ? "连续开屏休息提醒。\r\n\r\n" : (historyToday ? "正在查询并整理历史上的今天。\r\n\r\n" : "AI 宠物主动发言。\r\n\r\n")),
-                Updated = DateTime.Now,
-                Unread = false
-            };
-            activities.Insert(0, currentActivity);
-            lastReplyActivity = currentActivity;
-            while (activities.Count > 30) activities.RemoveAt(activities.Count - 1);
+            string directory = Directory.Exists(promptForm.WorkingDirectory)
+                ? promptForm.WorkingDirectory : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            BeginCharacterConversation(character, directory).BeginAssistantTurn();
             RefreshActivities();
             BeginReplyBubble(brainRequestReason == "break" ? character.Name + " 正在准备休息提醒" : (historyToday ? character.Name + " 正在翻历史日历" : character.Name + " 正在想和你说什么"));
             replyBubble.SetStatus(brainRequestReason == "break" ? character.Name + " 正在关心你的用屏时间…" : (historyToday ? character.Name + " 正在整理今天的重要事件…" : character.Name + " 正在组织想说的话…"));
@@ -1962,14 +2022,11 @@ namespace AgentPal
             SetClaudeEvent("UserPromptSubmit");
             try
             {
-                string directory = Directory.Exists(promptForm.WorkingDirectory)
-                    ? promptForm.WorkingDirectory
-                    : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                 bool refillAiPaths = ShouldRefillAiPathPool(movementPathMode, aiPathPool.Count);
                 string brainPrompt = brainRequestReason == "doubleclick"
                     ? PetBrain.BuildProactivePrompt(character, DateTime.Now, refillAiPaths)
                     : (historyToday ? PetBrain.BuildHistoryTodayPrompt(character, DateTime.Now) : PetBrain.BuildCarePrompt(character, DateTime.Now, brainRequestReason, brainScreenMinutes));
-                claudeRunner.Start(brainPrompt, directory, null, null, character.Id);
+                claudeRunner.Start(brainPrompt, directory, currentActivity.SessionId, null, character.Id);
             }
             catch (Exception ex)
             {
@@ -1990,7 +2047,7 @@ namespace AgentPal
             brainResponse.Length = 0;
             if (completedReason == "doubleclick")
             {
-                trailColors = response.TrailColors;
+                trailColors = CompanionAppearance.HasCustom(currentCharacterId)?CompanionAppearance.Colors(currentCharacterId):response.TrailColors;
                 trailStyle = response.TrailStyle;
                 if (response.PathPlans != null)
                     foreach (PetPathPlan plan in response.PathPlans)
@@ -2011,7 +2068,7 @@ namespace AgentPal
             replyBubble.SetStatus(exitCode == 0 ? character.Name + actionStatus + routeStatus : character.Name + " · 本地备用发言");
             ShowReplyBubble(true);
             if (currentActivity != null)
-                currentActivity.AppendOutput(character.Name + "：" + response.Speech + "\r\n");
+                currentActivity.AppendOutput(response.Speech + "\r\n");
             CompleteCurrentActivity(exitCode == 0 ? "就绪" : "受阻");
             SetClaudeEvent(exitCode == 0 ? "Stop" : "StopFailure");
             if (completedReason == "doubleclick" && !paused && reminderOverlay == null) StartPlayfulRun();
@@ -2023,24 +2080,11 @@ namespace AgentPal
             if(claudeRunner.IsRunning){MessageBox.Show(activityTray,"请等待当前回复完成后再发送。","agent-pal");return;}
             try
             {
-                currentActivity = new ActivityRecord
-                {
-                    Title = prompt.Length > 42 ? prompt.Substring(0, 42) + "…" : prompt,
-                    CharacterId = currentCharacterId,
-                    WorkingDirectory = workingDirectory,
-                    State = "正在运行",
-                    Output = "你：" + prompt + "\r\n\r\n",
-                    Updated = DateTime.Now,
-                    Unread = false
-                };
-                currentActivity.StartConversation(prompt);
-                activities.Insert(0, currentActivity);
-                lastReplyActivity = currentActivity;
-                while (activities.Count > 30) activities.RemoveAt(activities.Count - 1);
+                BeginCharacterConversation(PetCharacter.Find(currentCharacterId), workingDirectory).AppendUserPrompt(prompt);
                 RefreshActivities();
                 BeginReplyBubble(prompt);
                 SetClaudeEvent("UserPromptSubmit");
-                claudeRunner.Start(PetBrain.BuildConversationPrompt(PetCharacter.Find(currentCharacterId), prompt), workingDirectory, null, null, currentCharacterId);
+                claudeRunner.Start(PetBrain.BuildConversationPrompt(PetCharacter.Find(currentCharacterId), prompt), workingDirectory, currentActivity.SessionId, null, currentCharacterId);
             }
             catch (Exception ex)
             {
@@ -2054,7 +2098,7 @@ namespace AgentPal
 
         private bool RunClaudeReply(ActivityRecord activity, string prompt)
         {
-            if (activity == null || String.IsNullOrWhiteSpace(activity.SessionId) || String.IsNullOrWhiteSpace(prompt)) return false;
+            if (activity == null || (!activity.CharacterConversation && String.IsNullOrWhiteSpace(activity.SessionId)) || String.IsNullOrWhiteSpace(prompt)) return false;
             if (claudeRunner.IsRunning)
             {
                 MessageBox.Show(activityTray, "Claude 正在处理上一条消息，请完成后再回复。", "Claude Code", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -2159,25 +2203,25 @@ namespace AgentPal
 
         private void BeginReplyBubble(string prompt)
         {
-            promptForm.Hide();
-            activityTray.HideUnlessPinned();
-            reminderForm.Hide();
-            claudeTaskForm.Hide();
-            EnsureRoomForReplyBubbleBelow();
-            replyBubble.BeginRequest(prompt, Bounds);
+            replyPendingAfterEditing = false;
+            replyBubble.BeginRequest(prompt);
         }
 
         private void ShowReplyBubble(bool force = false)
         {
+            if (!replyBubble.HasReply || activityTray.PinnedOpen) return;
             if (userHidden && !force) return;
-            if (force && userHidden) ShowPet();
             if (!force && replyBubble.UserDismissed) return;
-            if (activityTray.PinnedOpen) return;
-            promptForm.Hide();
-            activityTray.HideUnlessPinned();
-            reminderForm.Hide();
-            claudeTaskForm.Hide();
-            EnsureRoomForReplyBubbleBelow();
+            if (IsEditingInteraction())
+            {
+                replyPendingAfterEditing = true;
+                return;
+            }
+            replyPendingAfterEditing = false;
+            if (force && userHidden) ShowPet();
+            if (String.IsNullOrEmpty(dockedEdge)) EnsureRoomForReplyBubbleBelow();
+            SyncConversationOpacity();
+            if (!replyBubble.Visible) replyBubble.FlushPendingReply();
             replyBubble.ShowNear(Bounds, force);
         }
 
@@ -2316,7 +2360,7 @@ namespace AgentPal
         internal static string BuildScheduledTaskPrompt(ScheduledClaudeTask task)
         {
             if (task == null) return "";
-            return "你正在通过桌面宠物执行一个用户预先配置的 Claude Code 定时任务。\n实际工作目录：" + task.WorkingDirectory + "\n请先确认当前工作目录就是上述目录，并以该目录为唯一任务根目录；如任务会产生文件修改，请直接完成并在回复中简要说明结果。\n\n任务：\n" + task.Prompt;
+            return "你正在通过桌面伙伴执行一个用户预先配置的 Claude Code 定时任务。\n实际工作目录：" + task.WorkingDirectory + "\n请先确认当前工作目录就是上述目录，并以该目录为唯一任务根目录；如任务会产生文件修改，请直接完成并在回复中简要说明结果。\n\n任务：\n" + task.Prompt;
         }
 
         private void RunVisibleScheduledClaudeTask(ScheduledClaudeTask task)
@@ -2374,6 +2418,11 @@ namespace AgentPal
             string settingsArguments = settingsPath.Length == 0 ? "" : " --settings $agentPalSettings";
             string directory = Path.GetFullPath(task.WorkingDirectory);
             bool interactive = ClaudeTaskService.IsInteractiveMode(task.RunMode);
+            if(interactive)
+            {
+                settingsPath=NativeTaskHooks.CreateSessionSettings(settingsPath,logPath);
+                settingsArguments=" --settings $agentPalSettings";
+            }
             bool terminal = ClaudeTaskService.NormalizeRunMode(task.RunMode) == "terminal" || ClaudeTaskService.NormalizeRunMode(task.RunMode) == "interactive-terminal";
             string terminalToken = "OrbitTask-" + Guid.NewGuid().ToString("N");
             string terminalPath = terminal ? FindWindowsTerminal() : null;
@@ -2435,6 +2484,7 @@ namespace AgentPal
                 "$code=$LASTEXITCODE; if($null -eq $code){$code=1} " +
                 "} catch { $line='[执行失败] '+[string]$_; Write-Host $line; [IO.File]::AppendAllText('" + safeLog + "',$line+[Environment]::NewLine,$utf8) } " +
                 "finally { [IO.File]::WriteAllText('" + safeLog + ".completed.tmp',[string][int]$code,$utf8); [IO.File]::Move('" + safeLog + ".completed.tmp','" + safeLog + ".completed'); " +
+                (interactive ? "Remove-Item -LiteralPath '"+Path.GetFullPath(settingsPath).Replace("'","''")+"' -ErrorAction SilentlyContinue; " : "") +
                 (interactive ? "Remove-Item Env:AGENT_PAL_PET_NATIVE_RUN_LOG,Env:AGENT_PAL_PET_NATIVE_RUN_TOKEN,Env:AGENT_PAL_PET_INTERNAL_TASK_ID,Env:AGENT_PAL_PET_MANAGED_SESSION -ErrorAction SilentlyContinue; " : "") +
                 (settingsPath.Length > 0 ? "Remove-Item Env:AGENT_PAL_PET_SETTINGS_FILE -ErrorAction SilentlyContinue; " : "") + "}; " +
                 (terminal || interactive ? "Write-Host ('[任务结束] 退出码：'+$code)" : "exit [int]$code");
@@ -2487,8 +2537,13 @@ namespace AgentPal
 
         private void ShowNextReminder()
         {
-            if (reminderOverlay != null || reminderQueue.Count == 0) return;
-            DailyReminder reminder = reminderQueue.Dequeue();
+            if (reminderOverlay != null || reminderQueue.Count == 0 || IsEditingInteraction()) return;
+            ShowReminder(reminderQueue.Dequeue());
+        }
+
+        private void ShowReminder(DailyReminder reminder)
+        {
+            if (reminder == null || reminderOverlay != null) return;
             if (!petWasVisibleBeforeReminder) petWasVisibleBeforeReminder = Visible;
             promptForm.Hide();
             replyBubble.Hide();
@@ -2516,7 +2571,7 @@ namespace AgentPal
             ReminderOverlayForm completed = reminderOverlay;
             reminderOverlay = null;
             if (completed != null) completed.Dispose();
-            if (reminderQueue.Count > 0)
+            if (reminderQueue.Count > 0 && !IsEditingInteraction())
             {
                 ShowNextReminder();
                 return;
@@ -2608,18 +2663,17 @@ namespace AgentPal
 
         private void AnchorAuxiliaryWindows()
         {
-            if (promptForm.Visible) promptForm.ShowNear(Bounds);
-            if (replyBubble.Visible) replyBubble.ShowNear(Bounds);
-            if (activityTray.Visible) activityTray.ShowNear(Bounds);
-            if (reminderForm.Visible) reminderForm.ShowNear(Bounds);
-            if (claudeTaskForm.Visible) claudeTaskForm.ShowNear(Bounds, promptForm.WorkingDirectory);
+            if (promptForm.Visible) promptForm.ShowNear(Bounds, false);
+            if (replyBubble.Visible && !IsEditingInteraction()) replyBubble.ShowNear(Bounds);
+            if (activityTray.Visible) activityTray.ShowNear(Bounds, false);
+            if (reminderForm.Visible) reminderForm.ShowNear(Bounds, false);
+            if (claudeTaskForm.Visible) claudeTaskForm.ShowNear(Bounds, null, false);
             if (quoteBubble.Visible) quoteBubble.Reposition(Bounds);
         }
 
         private void SetPetScale(float scale, bool save)
         {
-            if (Single.IsNaN(scale) || Single.IsInfinity(scale)) scale = 0.5f;
-            petScale = Math.Max(0.5f, Math.Min(1.25f, scale));
+            petScale = NormalizePetScale(scale);
             // Discard the old canvas before changing native HWND dimensions.
             // Handle creation/paint during ClientSize assignment must not submit
             // a previous-size HBITMAP and stretch/clip its rows.
@@ -2646,7 +2700,7 @@ namespace AgentPal
             catch (Exception ex) { MessageBox.Show("角色资源加载失败，已保留当前形象。\n" + ex.Message, Program.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             CancelWander();
             currentCharacterId = character.Id;
-            trailColors = PetBrain.DefaultColors(character.Id);
+            trailColors = CompanionAppearance.Colors(character.Id);
             trailStyle = "rainbow";
             trailOverlay.Configure(trailColors, trailStyle, trailOpacity);
             state = "idle";
@@ -2666,20 +2720,12 @@ namespace AgentPal
 
         private void RefreshTrayIcon()
         {
-            if (!animations.ContainsKey("idle") || animations["idle"].Count == 0) return;
-            using (Bitmap iconBitmap = AppIcon.CreateBitmap(animations["idle"][0], 32))
+            if (tray.Icon == null)
             {
-                IntPtr handle = iconBitmap.GetHicon();
-                try
-                {
-                    Icon previous = tray.Icon;
-                    tray.Icon = (Icon)Icon.FromHandle(handle).Clone();
-                    Icon = AppIcon.WindowIcon;
-                    if (previous != null) previous.Dispose();
-                }
-                finally { DestroyIcon(handle); }
+                tray.Icon = (Icon)AppIcon.WindowIcon.Clone();
             }
-            tray.Text = PetCharacter.Find(currentCharacterId).Name + " · Claude Code";
+            Icon = AppIcon.WindowIcon;
+            tray.Text = Program.ProductName + " · " + PetCharacter.Find(currentCharacterId).Name;
         }
 
         private void ResetPosition()
@@ -2714,13 +2760,8 @@ namespace AgentPal
                         TopMost = Convert.ToString(key.GetValue("AlwaysOnTop", 1)) != "0";
                         desktopScope = Convert.ToString(key.GetValue("DesktopScope")) == "first" ? "first" : "all";
                         object revisionValue = key.GetValue("ScaleDefaultRevision");
-                        bool useHalfSizeDefault = revisionValue == null || Convert.ToInt32(revisionValue) < 1;
-                        object scaleValue = useHalfSizeDefault ? null : key.GetValue("Scale");
-                        float savedScale;
-                        if (scaleValue != null && Single.TryParse(Convert.ToString(scaleValue), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out savedScale))
-                            SetPetScale(savedScale, false);
-                        else
-                            SetPetScale(0.5f, false);
+                        int scaleRevision;Int32.TryParse(Convert.ToString(revisionValue),out scaleRevision);
+                        SetPetScale(ReadSavedPetScale(Convert.ToString(key.GetValue("Scale")),scaleRevision),false);
                         object motionValue = key.GetValue("ReduceMotion");
                         if (motionValue != null) reduceMotion = Convert.ToInt32(motionValue) != 0;
                         object trailOpacityValue = key.GetValue("TrailOpacity");
@@ -2778,7 +2819,7 @@ namespace AgentPal
                     key.SetValue("DesktopScope", desktopScope, RegistryValueKind.String);
                     key.SetValue("Y", Top, RegistryValueKind.DWord);
                     key.SetValue("Scale", petScale.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    key.SetValue("ScaleDefaultRevision", 1, RegistryValueKind.DWord);
+                    key.SetValue("ScaleDefaultRevision", 2, RegistryValueKind.DWord);
                     key.SetValue("ReduceMotion", reduceMotion ? 1 : 0, RegistryValueKind.DWord);
                     key.SetValue("Character", currentCharacterId, RegistryValueKind.String);
                     key.SetValue("DockEdge", dockedEdge, RegistryValueKind.String);
@@ -2821,6 +2862,7 @@ namespace AgentPal
         {
             closingPet = true;
             artifactTravel.Reset();DisposeArtifactCanvas();
+            DisposeFlightArtwork();
             DisposeWorkshop();
             DisposeCharacterPackWatching();
             backgroundTaskSupervisor.Dispose();

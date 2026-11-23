@@ -35,7 +35,7 @@ namespace AgentPal
         internal static string BuildProactivePrompt(PetCharacter character, DateTime now, bool requestAiPath)
         {
             string pathInstruction = requestAiPath
-                ? "\n这次需要一次性补充24条全屏运动路线，供宠物之后在本地逐条使用；不要只返回一条，也不要要求后续再次调用你。每条从 smooth、bezier、wave、orbit 中选择一种，给出5到8个不重复的归一化控制点。坐标范围0.04到0.96，每条路线至少横跨屏幕宽度70%和高度55%，路线之间要有明显差异。" +
+                ? "\n这次需要一次性补充24条全屏运动路线，供伙伴之后在本地逐条使用；不要只返回一条，也不要要求后续再次调用你。每条从 smooth、bezier、wave、orbit 中选择一种，给出5到8个不重复的归一化控制点。坐标范围0.04到0.96，每条路线至少横跨屏幕宽度70%和高度55%，路线之间要有明显差异。" +
                   "\n连续输出恰好24行路线，每行格式如下：" +
                   "\nPATH|curve=曲线类型|points=0.10,0.50;0.28,0.12;0.72,0.88;0.92,0.35;0.50,0.08"
                 : "";
@@ -153,6 +153,9 @@ namespace AgentPal
 
         internal static Color[] DefaultColors(string characterId)
         {
+            if(String.Equals(characterId,"bailong",StringComparison.OrdinalIgnoreCase))return new[]{Color.FromArgb(160,204,216),Color.FromArgb(215,232,231),Color.FromArgb(180,197,221),Color.FromArgb(211,194,142)};
+            if (String.Equals(characterId, "sun-wukong", StringComparison.OrdinalIgnoreCase))
+                return new[] { Color.FromArgb(235, 181, 70), Color.FromArgb(255, 212, 116), Color.FromArgb(184, 62, 38), Color.FromArgb(229, 120, 65) };
             if (String.Equals(characterId, "orbit", StringComparison.OrdinalIgnoreCase))
                 return new[] { Color.FromArgb(85, 169, 185), Color.FromArgb(117, 213, 209), Color.FromArgb(222, 185, 108), Color.FromArgb(111, 156, 216) };
             if (String.Equals(characterId, "spark", StringComparison.OrdinalIgnoreCase))

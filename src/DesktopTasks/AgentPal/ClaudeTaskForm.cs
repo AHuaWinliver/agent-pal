@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -6,13 +6,16 @@ using System.Windows.Forms;
 
 namespace AgentPal
 {
-    internal sealed class ClaudeTaskForm : Form
+    internal sealed class ClaudeTaskForm : AppWindow
     {
         private readonly ClaudeTaskService service;
         private readonly TextBox prompt = new TextBox();
         private readonly Button directory = new Button();
         private readonly ComboBox recurrence = new ComboBox();
         private readonly ComboBox weekday = new ComboBox();
+        private readonly WeekdayPicker weekdayPicker = new WeekdayPicker();
+        private static readonly string[] Recurrences = { "daily", "weekly", "interval", "workdays", "weekend", "selected-days", "weekly-interval" };
+        private readonly Label weeklyIntervalLabel=new Label {Text="当日重复间隔",AutoSize=true,Location=new Point(16,181)};
         private readonly DateTimePicker time = new DateTimePicker();
         private readonly NumericUpDown intervalValue = new NumericUpDown();
         private readonly ComboBox intervalUnit = new ComboBox();
@@ -34,6 +37,7 @@ namespace AgentPal
         private string workingDirectory;
         private ScheduledClaudeTask editingTask;
         private string missingOwner;
+        private CompanionConfigurationTip configurationTip;
 
         private string SelectedOwner
         {
@@ -82,7 +86,7 @@ namespace AgentPal
         internal ClaudeTaskForm(ClaudeTaskService taskService)
         {
             service = taskService;
-            Text = "Claude Code 定时任务";
+            Text = "定时任务";
             Icon = AppIcon.WindowIcon;
             ClientSize = new Size(610, 698);
             FormBorderStyle = FormBorderStyle.None;
@@ -92,10 +96,12 @@ namespace AgentPal
             TopMost = true;
             BackColor = Color.FromArgb(253, 253, 252);
             DoubleBuffered = true;
+            KeyPreview=true;
+            KeyDown+=delegate(object sender,KeyEventArgs e){if(e.Control&&e.KeyCode==Keys.S&&editingTask!=null){e.SuppressKeyPress=true;SaveTask();}};
             Font = UiText.Font(9f);
 
-            Label title = new Label { Text = "Claude Code 定时任务", Font = UiText.Font(11f, FontStyle.Bold), ForeColor = Color.FromArgb(34, 34, 32), AutoSize = true, Location = new Point(20, 17) };
-            Label subtitle = new Label { Text = "任务输出在「运行情况」查看", ForeColor = Color.FromArgb(112, 112, 106), AutoSize = true, Location = new Point(20, 42) };
+            Label title = new Label { Text = "定时任务", Font = UiText.Font(11f, FontStyle.Bold), ForeColor = Color.FromArgb(34, 34, 32), AutoSize = true, Location = new Point(20, 17) };
+            Label subtitle = new Label { Text = "选择任务后点击修改任务；执行结果在运行情况中查看。", ForeColor = Color.FromArgb(112, 112, 106), AutoSize = true, Location = new Point(20, 42) };
             Button close = TextButton("×", new Point(564, 8), new Size(30, 30));
             close.Font = new Font("Segoe UI", 13f);
             close.Click += delegate { Hide(); };
@@ -152,52 +158,56 @@ namespace AgentPal
             editor.Controls.Add(new Label { Text = "虚拟桌面（Win+Tab），需提前创建", AutoSize = true, Location = new Point(88, 218), ForeColor = Color.FromArgb(120, 120, 115), Font = UiText.Font(7.5f), BackColor = editor.BackColor });
 
             recurrence.DropDownStyle = ComboBoxStyle.DropDownList;
-            recurrence.Items.AddRange(new object[] { "每天", "每周", "每隔一段时间" });
+            recurrence.Items.AddRange(new object[] { "每天", "每周", "每隔一段时间", "周一至周五", "周六至周日", "自选星期", "指定星期内间隔" });
+            recurrence.DropDownWidth=260;
             recurrence.SelectedIndex = 0;
             recurrence.Location = new Point(88, 141);
-            recurrence.Size = new Size(126, 28);
+            recurrence.Size = new Size(178, 28);
             recurrence.SelectedIndexChanged += delegate { UpdateScheduleControls(); };
 
             weekday.DropDownStyle = ComboBoxStyle.DropDownList;
             for (int day = 0; day < 7; day++) weekday.Items.Add(ScheduledClaudeTask.WeekdayText(day));
             weekday.SelectedIndex = (int)DateTime.Now.DayOfWeek;
-            weekday.Location = new Point(222, 141);
-            weekday.Size = new Size(100, 28);
+            weekday.Location = new Point(276, 141);
+            weekday.Size = new Size(154, 28);
+            weekdayPicker.Bounds = new Rectangle(276, 141, 154, 28);
 
             time.Format = DateTimePickerFormat.Custom;
             time.CustomFormat = "HH:mm";
             time.ShowUpDown = true;
             time.Value = DateTime.Today.AddHours(9);
-            time.Location = new Point(330, 141);
-            time.Size = new Size(66, 28);
+            time.Location = new Point(440, 141);
+            time.Size = new Size(78, 28);
 
             intervalValue.Minimum = 1;
             intervalValue.Maximum = 10080;
             intervalValue.Value = 60;
-            intervalValue.Location = new Point(222, 141);
+            intervalValue.Location = new Point(276, 141);
             intervalValue.Size = new Size(82, 28);
             intervalUnit.DropDownStyle = ComboBoxStyle.DropDownList;
             intervalUnit.Items.AddRange(new object[] { "分钟", "小时", "天" });
             intervalUnit.SelectedIndex = 0;
-            intervalUnit.Location = new Point(314, 141);
+            intervalUnit.Location = new Point(368, 141);
             intervalUnit.Size = new Size(82, 28);
 
             cancelEdit.Text = "取消";
-            cancelEdit.Location = new Point(402, 138);
-            cancelEdit.Size = new Size(56, 34);
+            cancelEdit.Name="CancelScheduledTaskEdit";
+            cancelEdit.Location = new Point(332, 240);
+            cancelEdit.Size = new Size(88, 34);
             cancelEdit.Visible = false;
             StyleButton(cancelEdit, false);
             cancelEdit.Click += delegate { CancelEditing(); };
             save.Text = "添加任务";
-            save.Location = new Point(464, 138);
-            save.Size = new Size(96, 34);
+            save.Name="SaveScheduledTask";
+            save.Location = new Point(426, 240);
+            save.Size = new Size(134, 34);
             StyleButton(save, true);
             save.Click += delegate { SaveTask(); };
             owner.DropDownStyle = ComboBoxStyle.DropDownList;
             owner.Location = new Point(88, 242);
             owner.Size = new Size(200, 30);
             RefreshOwners("orbit");
-            editor.Controls.Add(NewLabel("执行道友", new Point(16, 246), editor.BackColor));
+            editor.Controls.Add(NewLabel("执行伙伴", new Point(16, 246), editor.BackColor));
             editor.Controls.Add(owner);
             Label note = new Label { Text = "任务由本机 claude CLI 执行；电脑休眠期间不会唤醒，恢复后补执行到期任务。", ForeColor = Color.FromArgb(120, 120, 115), AutoSize = true, Location = new Point(17, 282), BackColor = editor.BackColor, Font = UiText.Font(7.5f) };
             runMode.SelectedIndexChanged += delegate
@@ -213,14 +223,18 @@ namespace AgentPal
             editor.Controls.Add(NewLabel("重复", new Point(16, 145), editor.BackColor));
             editor.Controls.Add(recurrence);
             editor.Controls.Add(weekday);
+            editor.Controls.Add(weekdayPicker);
             editor.Controls.Add(time);
             editor.Controls.Add(intervalValue);
             editor.Controls.Add(intervalUnit);
             editor.Controls.Add(cancelEdit);
             editor.Controls.Add(save);
             editor.Controls.Add(note);
+            foreach(Control control in editor.Controls)if(control.Top>=180)control.Top+=36;
+            editor.Height+=36;
+            editor.Controls.Add(weeklyIntervalLabel);
 
-            Label taskTitle = new Label { Text = "全部道友任务", Font = UiText.Font(9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(52, 52, 49), AutoSize = true, Location = new Point(20, 290) };
+            Label taskTitle = new Label { Text = "全部 Agent 任务", Font = UiText.Font(9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(52, 52, 49), AutoSize = true, Location = new Point(20, 290) };
             RoundedPanel listCard = new RoundedPanel { Radius = 16, BorderColor = Color.FromArgb(226, 226, 223), BackColor = Color.FromArgb(247, 247, 246), Location = new Point(16, 316), Size = new Size(578, 205) };
             list.BorderStyle = BorderStyle.None;
             list.BackColor = listCard.BackColor;
@@ -232,6 +246,8 @@ namespace AgentPal
             list.DrawItem += DrawTask;
             list.SelectedIndexChanged += delegate { UpdateButtons(); };
             list.DoubleClick += delegate { EditSelectedTask(); };
+            list.Name="ScheduledTaskList";
+            list.KeyDown+=delegate(object sender,KeyEventArgs e){if(e.KeyCode==Keys.F2){e.SuppressKeyPress=true;EditSelectedTask();}};
             listCard.Controls.Add(list);
 
             toggle.Text = "停用";
@@ -244,15 +260,16 @@ namespace AgentPal
             delete.Size = new Size(72, 34);
             StyleButton(delete, false);
             delete.ForeColor = Color.FromArgb(174, 65, 58);
-            delete.Click += delegate { service.Delete(list.SelectedItem as ScheduledClaudeTask); RefreshList(null); };
-            edit.Text = "编辑";
+            delete.Click += delegate {var selected=list.SelectedItem as ScheduledClaudeTask;if(Object.ReferenceEquals(selected,editingTask))CancelEditing();service.Delete(selected); RefreshList(null); };
+            edit.Name="EditScheduledTask";
+            edit.Text = "修改任务";
             edit.Location = new Point(176, 535);
-            edit.Size = new Size(72, 34);
+            edit.Size = new Size(96, 34);
             StyleButton(edit, false);
             edit.Click += delegate { EditSelectedTask(); };
             history.Text = "运行情况";
-            history.Location = new Point(256, 535);
-            history.Size = new Size(96, 34);
+            history.Location = new Point(280, 535);
+            history.Size = new Size(112, 34);
             StyleButton(history, false);
             history.Click += delegate { ShowHistory(); };
             runNow.Text = "立即执行";
@@ -276,6 +293,9 @@ namespace AgentPal
             taskTitle.Top += 112;
             listCard.Top += 112;
             foreach (Button button in new Button[] { toggle, delete, edit, history, runNow }) button.Top += 112;
+            taskTitle.Top+=36;listCard.Top+=36;
+            foreach(Button button in new[]{toggle,delete,edit,history,runNow})button.Top+=36;
+            ClientSize=new Size(ClientSize.Width,ClientSize.Height+36);
             FormClosed += delegate { foreach (Image image in avatars.Values) image.Dispose(); avatars.Clear(); };
             FormClosing += delegate(object sender, FormClosingEventArgs e) { if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } };
             Resize += delegate { ApplyRoundedRegion(); };
@@ -284,12 +304,14 @@ namespace AgentPal
             UpdateDirectoryText();
             UpdateScheduleControls();
             RefreshList(null);
+            configurationTip=new CompanionConfigurationTip(owner,index=>index>=0&&index<ownerProfiles.Length?ownerProfiles[index].Id:null);
+            configurationTip.BindList(list,index=>index>=0&&index<list.Items.Count?((ScheduledClaudeTask)list.Items[index]).CharacterId:null);
             ApplyRoundedRegion();
         }
 
-        internal void ShowNear(Rectangle petBounds, string defaultDirectory)
+        internal void ShowNear(Rectangle petBounds, string defaultDirectory, bool activate = true)
         {
-            if (!String.IsNullOrWhiteSpace(defaultDirectory) && Directory.Exists(defaultDirectory))
+            if (activate && editingTask==null && String.IsNullOrWhiteSpace(prompt.Text) && !String.IsNullOrWhiteSpace(defaultDirectory) && Directory.Exists(defaultDirectory))
             {
                 workingDirectory = Path.GetFullPath(defaultDirectory);
                 UpdateDirectoryText();
@@ -299,6 +321,7 @@ namespace AgentPal
             int y = petBounds.Bottom + 8;
             if (y + Height > area.Bottom - 8) y = petBounds.Top - Height - 8;
             Location = new Point(x, Math.Max(area.Top + 8, y));
+            if (!activate) return;
             if (!Visible) Show();
             Location = new Point(x, Math.Max(area.Top + 8, y));
             Activate();
@@ -327,15 +350,16 @@ namespace AgentPal
         {
             string taskText = prompt.Text.Trim();
             if (taskText.Length == 0) { prompt.Focus(); return; }
-            string mode = recurrence.SelectedIndex == 1 ? "weekly" : (recurrence.SelectedIndex == 2 ? "interval" : "daily");
+            string mode = Recurrences[Math.Max(0, recurrence.SelectedIndex)];
+            int dayMask = mode == "selected-days"||mode=="weekly-interval" ? weekdayPicker.Selection : 0;
             int multiplier = intervalUnit.SelectedIndex == 2 ? 1440 : (intervalUnit.SelectedIndex == 1 ? 60 : 1);
             try
             {
                 ScheduledClaudeTask added = editingTask;
                 if (editingTask == null)
-                    added = service.Add(taskText, workingDirectory, mode, time.Value.TimeOfDay, (DayOfWeek)Math.Max(0, weekday.SelectedIndex), (int)intervalValue.Value * multiplier, DateTime.Now, SelectedRunMode(), overlapMode.SelectedIndex == 1 ? "parallel" : "block", SelectedOwner);
+                    added = service.Add(taskText, workingDirectory, mode, time.Value.TimeOfDay, (DayOfWeek)Math.Max(0, weekday.SelectedIndex), (int)intervalValue.Value * multiplier, DateTime.Now, SelectedRunMode(), overlapMode.SelectedIndex == 1 ? "parallel" : "block", SelectedOwner, dayMask);
                 else
-                    service.Update(editingTask, taskText, workingDirectory, mode, time.Value.TimeOfDay, (DayOfWeek)Math.Max(0, weekday.SelectedIndex), (int)intervalValue.Value * multiplier, DateTime.Now, SelectedRunMode(), overlapMode.SelectedIndex == 1 ? "parallel" : "block", SelectedOwner);
+                    service.Update(editingTask, taskText, workingDirectory, mode, time.Value.TimeOfDay, (DayOfWeek)Math.Max(0, weekday.SelectedIndex), (int)intervalValue.Value * multiplier, DateTime.Now, SelectedRunMode(), overlapMode.SelectedIndex == 1 ? "parallel" : "block", SelectedOwner, dayMask);
                 service.SetDesktop(added, desktop.SelectedIndex);
                 prompt.Clear();
                 editingTask = null;
@@ -359,7 +383,8 @@ namespace AgentPal
             prompt.Text = task.Prompt;
             workingDirectory = task.WorkingDirectory;
             UpdateDirectoryText();
-            recurrence.SelectedIndex = task.Recurrence == "weekly" ? 1 : (task.Recurrence == "interval" ? 2 : 0);
+            recurrence.SelectedIndex = Math.Max(0, Array.IndexOf(Recurrences, task.Recurrence));
+            weekdayPicker.Selection = task.WeekdayMask;
             runMode.SelectedIndex = Array.IndexOf(new[] { "background", "powershell", "terminal", "interactive-powershell", "interactive-terminal", "claude-background" }, ClaudeTaskService.NormalizeRunMode(task.RunMode));
             overlapMode.SelectedIndex = task.OverlapMode == "parallel" ? 1 : 0;
             desktop.SelectedIndex = ClaudeTaskService.NormalizeDesktopNumber(task.DesktopNumber);
@@ -397,10 +422,16 @@ namespace AgentPal
         {
             bool isInterval = recurrence.SelectedIndex == 2;
             bool isWeekly = recurrence.SelectedIndex == 1;
+            bool isWeeklyInterval=recurrence.SelectedIndex==6;
+            bool isCustom = recurrence.SelectedIndex == 5||isWeeklyInterval;
             weekday.Visible = isWeekly;
+            weekdayPicker.Visible = isCustom;
+            weekdayPicker.RefreshCaption();
             time.Visible = !isInterval;
-            time.Left = isWeekly ? 330 : 222;
-            intervalValue.Visible = intervalUnit.Visible = isInterval;
+            time.Left = isWeekly || isCustom ? 440 : 276;
+            intervalValue.Visible = intervalUnit.Visible = isInterval||isWeeklyInterval;
+            intervalValue.Top=intervalUnit.Top=isWeeklyInterval?177:141;
+            weeklyIntervalLabel.Visible=isWeeklyInterval;
         }
 
         private void UpdateDirectoryText()
@@ -481,9 +512,10 @@ namespace AgentPal
             Region = new Region(PromptForm.RoundedRectangle(ClientRectangle, 18));
             if (old != null) old.Dispose();
         }
+        protected override void Dispose(bool disposing){if(disposing&&configurationTip!=null)configurationTip.Dispose();base.Dispose(disposing);}
     }
 
-    internal sealed class ClaudeTaskHistoryForm : Form
+    internal sealed class ClaudeTaskHistoryForm : AppWindow
     {
         private readonly ScheduledClaudeTask task;
         private readonly ListView runs = new ListView();
@@ -628,12 +660,12 @@ namespace AgentPal
         }
     }
 
-    internal sealed class ClaudeTaskRunTranscriptForm : Form
+    internal sealed class ClaudeTaskRunTranscriptForm : AppWindow
     {
         private readonly Timer liveRefresh = new Timer { Interval = 400 };
         internal ClaudeTaskRunTranscriptForm(ScheduledClaudeTask task, ClaudeTaskRunRecord record)
         {
-            Text = "Claude Code 定时任务运行详情";
+            Text = "定时任务运行详情";
             Icon = AppIcon.WindowIcon;
             ClientSize = new Size(760, 560);
             StartPosition = FormStartPosition.CenterParent;
