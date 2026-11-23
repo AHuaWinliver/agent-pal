@@ -21,6 +21,7 @@ namespace AgentPal
         public string Recurrence = "daily";
         public int MinutesAfterMidnight = 9 * 60;
         public int Weekday = 1;
+        public int WeekdayMask;
         public int IntervalMinutes = 60;
         public string NextRunAt = "";
         public string LastRunAt = "";
@@ -36,9 +37,9 @@ namespace AgentPal
             get
             {
                 string time = (MinutesAfterMidnight / 60).ToString("00") + ":" + (MinutesAfterMidnight % 60).ToString("00");
-                if (Recurrence == "weekly") return "每" + WeekdayText(Weekday) + " " + time;
                 if (Recurrence == "interval") return "每隔 " + FormatInterval(IntervalMinutes);
-                return "每天 " + time;
+                if (Recurrence == "weekly-interval") return WeekdaySchedule.Describe(WeekdaySchedule.ForTask(Recurrence,Weekday,WeekdayMask),false)+" "+time+" 起，每隔 "+FormatInterval(IntervalMinutes);
+                return WeekdaySchedule.Describe(WeekdaySchedule.ForTask(Recurrence, Weekday, WeekdayMask), false) + " " + time;
             }
         }
 
@@ -151,11 +152,12 @@ namespace AgentPal
             return Add(prompt, directory, recurrence, time, weekday, intervalMinutes, now, runMode, overlapMode, null);
         }
 
-        internal ScheduledClaudeTask Add(string prompt, string directory, string recurrence, TimeSpan time, DayOfWeek weekday, int intervalMinutes, DateTime now, string runMode, string overlapMode, string characterId)
+        internal ScheduledClaudeTask Add(string prompt, string directory, string recurrence, TimeSpan time, DayOfWeek weekday, int intervalMinutes, DateTime now, string runMode, string overlapMode, string characterId, int weekdayMask = 0)
         {
             string cleanPrompt = (prompt ?? "").Trim();
             if (cleanPrompt.Length == 0) throw new ArgumentException("请输入要交给 Claude Code 执行的任务。", "prompt");
             if (String.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory)) throw new DirectoryNotFoundException("任务工作目录不存在。");
+            ValidateDaySelection(recurrence, weekdayMask);
             ScheduledClaudeTask task = new ScheduledClaudeTask
             {
                 Prompt = cleanPrompt.Length > 4000 ? cleanPrompt.Substring(0, 4000) : cleanPrompt,
@@ -164,6 +166,7 @@ namespace AgentPal
                 Recurrence = NormalizeRecurrence(recurrence),
                 MinutesAfterMidnight = Math.Max(0, Math.Min(1439, (int)time.TotalMinutes)),
                 Weekday = Math.Max(0, Math.Min(6, (int)weekday)),
+                WeekdayMask = weekdayMask,
                 IntervalMinutes = Math.Max(1, Math.Min(525600, intervalMinutes)),
                 RunMode = NormalizeRunMode(runMode),
                 OverlapMode = NormalizeOverlapMode(overlapMode),
@@ -192,18 +195,20 @@ namespace AgentPal
             Update(task, prompt, directory, recurrence, time, weekday, intervalMinutes, now, runMode, overlapMode, null);
         }
 
-        internal void Update(ScheduledClaudeTask task, string prompt, string directory, string recurrence, TimeSpan time, DayOfWeek weekday, int intervalMinutes, DateTime now, string runMode, string overlapMode, string characterId)
+        internal void Update(ScheduledClaudeTask task, string prompt, string directory, string recurrence, TimeSpan time, DayOfWeek weekday, int intervalMinutes, DateTime now, string runMode, string overlapMode, string characterId, int weekdayMask = 0)
         {
             if (task == null || !tasks.Contains(task)) return;
             string cleanPrompt = (prompt ?? "").Trim();
             if (cleanPrompt.Length == 0) throw new ArgumentException("请输入要交给 Claude Code 执行的任务。", "prompt");
             if (String.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory)) throw new DirectoryNotFoundException("任务工作目录不存在。");
+            ValidateDaySelection(recurrence, weekdayMask);
             task.Prompt = cleanPrompt.Length > 4000 ? cleanPrompt.Substring(0, 4000) : cleanPrompt;
             if (characterId != null) task.CharacterId = NormalizeCharacterId(characterId);
             task.WorkingDirectory = Path.GetFullPath(directory);
             task.Recurrence = NormalizeRecurrence(recurrence);
             task.MinutesAfterMidnight = Math.Max(0, Math.Min(1439, (int)time.TotalMinutes));
             task.Weekday = Math.Max(0, Math.Min(6, (int)weekday));
+            task.WeekdayMask = weekdayMask;
             task.IntervalMinutes = Math.Max(1, Math.Min(525600, intervalMinutes));
             task.RunMode = NormalizeRunMode(runMode);
             task.OverlapMode = NormalizeOverlapMode(overlapMode);
@@ -313,6 +318,7 @@ namespace AgentPal
         internal void CheckNow(DateTime now)
         {
             List<ScheduledClaudeTask> due = new List<ScheduledClaudeTask>();
+            bool rescheduled = false;
             foreach (ScheduledClaudeTask task in tasks)
             {
                 if (!task.Enabled) continue;
@@ -323,11 +329,22 @@ namespace AgentPal
                     task.NextRunAt = next.ToString("o", CultureInfo.InvariantCulture);
                 }
                 if (next > now) continue;
+                if (task.Recurrence == "workdays" || task.Recurrence == "weekend" || task.Recurrence == "selected-days" || task.Recurrence == "weekly-interval")
+                {
+                    int mask = WeekdaySchedule.ForTask(task.Recurrence, task.Weekday, task.WeekdayMask);
+                    if (!WeekdaySchedule.Includes(mask, now.DayOfWeek) ||
+                        now.TimeOfDay.TotalMinutes < task.MinutesAfterMidnight)
+                    {
+                        task.NextRunAt = CalculateNextRun(task, now).ToString("o", CultureInfo.InvariantCulture);
+                        rescheduled = true;
+                        continue;
+                    }
+                }
                 task.LastRunAt = now.ToString("o", CultureInfo.InvariantCulture);
                 task.NextRunAt = CalculateNextRun(task, now.AddSeconds(1)).ToString("o", CultureInfo.InvariantCulture);
                 due.Add(task);
             }
-            if (due.Count == 0) return;
+            if (due.Count == 0 && !rescheduled) return;
             SaveAndNotify();
             foreach (ScheduledClaudeTask task in due)
             {
@@ -341,23 +358,42 @@ namespace AgentPal
             if (task == null) return now.AddMinutes(1);
             string recurrence = NormalizeRecurrence(task.Recurrence);
             if (recurrence == "interval") return now.AddMinutes(Math.Max(1, task.IntervalMinutes));
-            DateTime candidate = now.Date.AddMinutes(Math.Max(0, Math.Min(1439, task.MinutesAfterMidnight)));
-            if (recurrence == "weekly")
+            if(recurrence=="weekly-interval")
             {
-                int target = Math.Max(0, Math.Min(6, task.Weekday));
-                int days = (target - (int)now.DayOfWeek + 7) % 7;
-                candidate = candidate.AddDays(days);
-                if (candidate <= now) candidate = candidate.AddDays(7);
-                return candidate;
+                int selection=WeekdaySchedule.ForTask(recurrence,task.Weekday,task.WeekdayMask);
+                int interval=Math.Max(1,task.IntervalMinutes);
+                for(int day=0;day<=7;day++)
+                {
+                    DateTime start=now.Date.AddDays(day).AddMinutes(Math.Max(0,Math.Min(1439,task.MinutesAfterMidnight)));
+                    if(!WeekdaySchedule.Includes(selection,start.DayOfWeek))continue;
+                    if(start>now)return start;
+                    long slot=(long)Math.Floor((now-start).TotalMinutes/interval)+1;
+                    DateTime next=start.AddMinutes(slot*interval);
+                    if(next.Date==start.Date)return next;
+                }
+                throw new InvalidOperationException("请选择有效的执行星期。");
             }
+            DateTime candidate = now.Date.AddMinutes(Math.Max(0, Math.Min(1439, task.MinutesAfterMidnight)));
+            int mask = WeekdaySchedule.ForTask(recurrence, task.Weekday, task.WeekdayMask);
             if (candidate <= now) candidate = candidate.AddDays(1);
+            while (!WeekdaySchedule.Includes(mask, candidate.DayOfWeek)) candidate = candidate.AddDays(1);
             return candidate;
+        }
+
+        private static void ValidateDaySelection(string recurrence, int mask)
+        {
+            if ((NormalizeRecurrence(recurrence) == "selected-days"||NormalizeRecurrence(recurrence)=="weekly-interval") && !WeekdaySchedule.ValidSelection(mask))
+                throw new ArgumentException(UiLanguage.Text("请选择至少一个星期。"));
         }
 
         internal static string NormalizeRecurrence(string value)
         {
             if (String.Equals(value, "weekly", StringComparison.OrdinalIgnoreCase)) return "weekly";
             if (String.Equals(value, "interval", StringComparison.OrdinalIgnoreCase)) return "interval";
+            if (String.Equals(value, "workdays", StringComparison.OrdinalIgnoreCase)) return "workdays";
+            if (String.Equals(value, "weekend", StringComparison.OrdinalIgnoreCase)) return "weekend";
+            if (String.Equals(value, "selected-days", StringComparison.OrdinalIgnoreCase)) return "selected-days";
+            if (String.Equals(value, "weekly-interval", StringComparison.OrdinalIgnoreCase)) return "weekly-interval";
             return "daily";
         }
 

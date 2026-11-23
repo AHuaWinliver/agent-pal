@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 1,
+  "status": "approved",
+  "approvedOn": "2026-11-23",
+  "approval": "User confirmed the current form of all six companions after reviewing the synchronized anatomy and animation preview.",
+  "scope": [
+    "character identity and proportions",
+    "neck and collar connection",
+    "shoulder and arm attachment",
+    "resting posture and current motion",
+    "foreground/background limb order"
+  ],
+  "calibrationSha256": "2e285de7d1a5b80b226771bca91667f6f6932a0cd72a3bbe54c52a81fcc08532",
+  "rendererSha256": {
+    "tools/BuildOriginalCharacters.cs": "aaba2b6574a3e871d53ccb7c36c63fb889b81382f68c5e14e80723d4b2b685c9",
+    "tools/BuildOriginalCharacters.Custom.cs": "752a9f16a13b69674e1ed2edbdc8a45cd6cb52c7afbe2a1c01a1e215eabc0c21",
+    "src/DesktopTasks/AgentPal/CompanionMotion.cs": "5a2ebd0f5799bfce91d09ebb8f4ae171b3c8529150f366f1172c2d03e20ec5f6"
+  },
+  "frameDigestFormat": "SHA256 of UTF-8 lines: state/NN.png + space + lowercase file SHA256 + LF; paths sorted ordinally",
+  "companions": [
+    {
+      "id": "orbit",
+      "name": "青衡",
+      "status": "approved",
+      "frameCount": 240,
+      "framesSha256": "2cb5adbbe24b3dbb832d7499825eb6d218fc93bfd274c6e45b591fde20ceafbf",
+      "expressionAttachment": [
+        0,
+        -8,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "spark",
+      "name": "绯笺",
+      "status": "approved",
+      "frameCount": 240,
+      "framesSha256": "867803c79d0a909133e2c55fcfe36d699b228fecbc05b3abfb44ae45ce8f2b6d",
+      "expressionAttachment": [
+        -5,
+        -13,
+        0,
+        7
+      ]
+    },
+    {
+      "id": "moss",
+      "name": "苍芷",
+      "status": "approved",
+      "frameCount": 240,
+      "framesSha256": "ea34754cee86b9b08fbf714cf3de71c66b7d595419e6c8a6c17886707e4a21bc",
+      "expressionAttachment": [
+        18,
+        -8,
+        0,
+        7
+      ]
+    },
+    {
+      "id": "sun-wukong",
+      "name": "行者悟空",
+      "status": "approved",
+      "frameCount": 240,
+      "framesSha256": "06f943502e36539a30a22494d7bfc862fc2a550b6d6ee86daabb2d0d32799666"
+    },
+    {
+      "id": "pippin",
+      "name": "小墨",
+      "status": "approved",
+      "frameCount": 240,
+      "framesSha256": "6bcba67366da2584b6d0d002aae1f0f99f6536fafe3341466bbf790c5d57da2a",
+      "expressionAttachment": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "bailong",
+      "name": "小白龙",
+      "status": "approved",
+      "frameCount": 240,
+      "framesSha256": "c9c91ad21caae8060d17bc8b52f8a0642d8485e40a238a93ed0169d4fe92fac6"
+    }
+  ],
+  "pendingMotionReview": {
+    "date": "2026-11-23",
+    "state": "waving",
+    "reason": "Keep the elbow outside the torso through the complete lowering phase; use a continuous joint-angle arc instead of flipping hand-target IK branches.",
+    "status": "approved for AgentPal 1.0.0 publication",
+    "otherStates": "unchanged from the approved baseline",
+    "approvedOn": "2026-11-24"
+  },
+  "pendingAttachmentReview": {
+    "date": "2026-11-23",
+    "companions": [
+      "moss",
+      "sun-wukong",
+      "bailong"
+    ],
+    "changes": [
+      "remove complete painted neck caps from garment layers",
+      "keep original neck behind collar using full contour masks",
+      "align Wukong and Bailong arms to their own garment sockets in both views",
+      "Wukong anatomical-left dorsal hand refinement below the unchanged bracer",
+      "remove pale background haze around Bailong profile head and torso",
+      "Cangzhi chest, back and waist volume with collar, head and hem fixed",
+      "Cangzhi expression imports preserve the neutral canvas, alpha silhouette and neck pixels"
+    ],
+    "status": "approved for AgentPal 1.0.0 publication",
+    "displayOrder": [
+      "orbit",
+      "spark",
+      "moss",
+      "sun-wukong",
+      "bailong",
+      "pippin"
+    ],
+    "approvedOn": "2026-11-24"
+  },
+  "releaseApproval": {
+    "version": "1.0.0",
+    "approvedOn": "2026-11-24",
+    "scope": "User authorized publication after review; retain the original preview cover illustration and update the product wording.",
+    "companions": [
+      {
+        "id": "orbit",
+        "frameCount": 240,
+        "framesSha256": "5f67baf3ffaa4235bf64e2fec472e28122f45a1c74452fdcf49800c8aa18c7b6"
+      },
+      {
+        "id": "spark",
+        "frameCount": 240,
+        "framesSha256": "49ca13dbf4d4ba9a3cd31b2963bb45588b32bcd70d85b2f36938ed7d4f7aa505"
+      },
+      {
+        "id": "moss",
+        "frameCount": 240,
+        "framesSha256": "9b550871535a218ae088f94362eefe7fe5ba538396ac2546c6b00b6119db904d"
+      },
+      {
+        "id": "sun-wukong",
+        "frameCount": 240,
+        "framesSha256": "501ff56bb393dec1ee251838f8089473a13afa4f3c206affd9143e823abf4881"
+      },
+      {
+        "id": "bailong",
+        "frameCount": 240,
+        "framesSha256": "6ee46bd4607d2ff310b7d59c1132f4bed601030c59cf7f6d5d3fb12d20b0a84f"
+      },
+      {
+        "id": "pippin",
+        "frameCount": 240,
+        "framesSha256": "a0932eacf96358c2fb2625514275c6f12d9182bd92b564118851ed22330be014"
+      }
+    ],
+    "calibrationSha256": "f60b2f906e61b4e57c5f88bf600b4eb6b8629edd6a3bf54146aa53cbf7ee94d1",
+    "rendererSha256": {
+      "tools/BuildOriginalCharacters.cs": "e7b279d3616fc3c9abaccd6a1a09a8f9b44016ecba9f6be8b4ac5380fbd321ab",
+      "tools/BuildOriginalCharacters.Custom.cs": "75b15e3b8d5233f4c3a64b1b0608438046fa7073b7b0b5c5121c3b754f2b4d5e",
+      "src/DesktopTasks/AgentPal/CompanionMotion.cs": "0ab303816aadb2313d9b8e805909789d94669395fd179cd63d95f4ed3cd7481a"
+    }
+  }
+}

@@ -1,11 +1,30 @@
-# Changelog
+﻿# Changelog
 
 [简体中文](CHANGELOG.zh-CN.md)
 
-## 1.0.0 · agent-pal · 2026-11-15
+## 1.0.0
 
-- Unify the application, installer, startup entry and repository under the agent-pal name.
-- Keep weekday scheduling for Claude Code tasks and reminders, and retain existing local settings on upgrade.
+[Release notes](docs/releases/1.0.0.md)
+
+### Highlights
+
+- **Right-click quick start:** assign work from the desktop or current folder using the selected companion's Claude executable and settings.
+- **More companions and customization:** adds Wukong and Bailong, with character-pack and collection import, an image-based creation wizard and companion management.
+- **Flexible scheduling:** choose weekdays, repeat at intervals and edit existing tasks or reminders.
+- **Clearer conversations:** chat bubbles show structured replies, execution progress and errors, with history grouped by companion.
+- **A unified AgentPal experience:** refreshed branding, installation, tray controls and everyday window interactions.
+
+### Improvements and fixes
+
+- More natural, consistent companion animation and more reliable display behavior.
+- Improved task execution, status reporting, error feedback and history consistency.
+- Installation, upgrades and uninstall preserve existing Claude configuration.
+- Updated English/Chinese documentation and character-authoring guides.
+
+### Agent collaboration (experimental)
+
+Team tasks support dependencies, parallel execution and failure handoffs. This feature is still being refined; use it with supervision.
+
 
 ## Unreleased · Linux candidate
 

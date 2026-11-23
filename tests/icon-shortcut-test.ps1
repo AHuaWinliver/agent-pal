@@ -1,10 +1,12 @@
-param([string]$TestRoot)
+param([string]$TestRoot,[string]$InstallerPath,[string]$PayloadDirectory)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $testExe = Join-Path $projectRoot 'build\IconShortcutTests.exe'
 $version=([Version][regex]::Match([IO.File]::ReadAllText((Join-Path $projectRoot 'src/DesktopTasks/AgentPal/Program.cs')),'AssemblyFileVersion\("([0-9.]+)"\)').Groups[1].Value).ToString(3)
 $installer = Join-Path $projectRoot ('dist\agent-pal-'+$version+'-Setup.exe')
+if($InstallerPath){$installer=[IO.Path]::GetFullPath($InstallerPath)}
+if(-not $PayloadDirectory){$PayloadDirectory=Join-Path $projectRoot 'build/payload'}
 if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) { throw 'Build the installer before running this test.' }
 & $compiler /nologo /target:exe /out:$testExe /reference:System.dll /reference:System.Drawing.dll (Join-Path $PSScriptRoot 'IconShortcutTests.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Icon / shortcut tests failed to compile.' }
@@ -32,7 +34,7 @@ try {
         Write-Output "PASS isolated installation $pass"
     }
     $pet = Join-Path $env:AGENT_PAL_INSTALL_ROOT 'agent-pal.exe'
-    if ((Get-FileHash -LiteralPath $pet).Hash -ne (Get-FileHash -LiteralPath (Join-Path $projectRoot 'build\payload\agent-pal.exe')).Hash) { throw 'Installed application does not match payload' }
+    if ((Get-FileHash -LiteralPath $pet).Hash -ne (Get-FileHash -LiteralPath (Join-Path $PayloadDirectory 'agent-pal.exe')).Hash) { throw 'Installed application does not match payload' }
     & $testExe $pet $installer
     if ($LASTEXITCODE -ne 0) { throw 'Icon / shortcut test failed.' }
 } finally {

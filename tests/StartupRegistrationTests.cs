@@ -54,6 +54,13 @@ internal static class StartupRegistrationTests
                 Require(approval.GetValue(legacy) == null && StartupRegistration.HasEntry(run), "Approval duplicate or startup detection failed");
                 StartupRegistration.SetEnabled(run, approval, false, null);
             }
+            foreach(string previous in new[]{StartupRegistration.PreviousPackageName,StartupRegistration.PreviousDisplayName})
+            {
+                run.SetValue(previous,command);approval.SetValue(previous,disabled,RegistryValueKind.Binary);
+                StartupRegistration.MigrateLegacy(run,approval);
+                Require((string)run.GetValue(name)==command&&run.GetValue(previous)==null&&((byte[])approval.GetValue(name)).SequenceEqual(disabled),"Branded-name migration lost the previous startup state");
+                StartupRegistration.SetEnabled(run,approval,false,null);
+            }
 
             string expandable = "\"%LOCALAPPDATA%\\agent-pal\\agent-pal.exe\"";
             run.SetValue(legacy, expandable, RegistryValueKind.ExpandString);

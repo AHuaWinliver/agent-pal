@@ -1,4 +1,4 @@
-# Getting started
+﻿# Getting started
 
 [简体中文](GETTING-STARTED.zh-CN.md)
 
@@ -6,7 +6,7 @@
 
 Download the Windows installer from [Releases](https://github.com/AHuaWinliver/agent-pal/releases). Use the package's SHA256 checksum to verify your download. The current installer is unsigned. For a source build, use a short path such as `C:\src\agent-pal` to avoid legacy .NET Framework path limits.
 
-The installer runs for the current user, offers an installation folder and language choice, and previews the original companions. It registers its own Claude hooks, backs up the existing settings and preserves other handlers. Silent installation also registers hooks. Preview builds on a development branch may contain features absent from the latest published installer; check its release notes.
+The installer runs for the current user, offers an installation folder and language choice, and previews all six companions together, followed by conversation, folder-task, scheduling and Agent-workspace features. Interactive setup allows at least six seconds for its stages and remains on its completion screen; choose **Open AgentPal** to launch. Installation, including silent installation and upgrades, does not write Claude settings. Native interactive tasks load their hooks from a private per-run overlay via `--settings`; selected configuration files stay unchanged. Preview builds on a development branch may contain features absent from the latest published installer; check its release notes.
 
 ## Connect Claude Code
 
@@ -20,7 +20,9 @@ Folder trust and tool permissions remain under Claude's control. Review prompts 
 
 - Right-click to change companions or open chat, tasks, reminders and settings.
 - Double-click a reply bubble to open the conversation; text becomes selectable there.
-- Drag the companion to reposition it. Drag to an edge to dock it; restore a hidden companion from the tray.
+- Drag the companion to reposition it. Drag to an edge to dock it; restore a hidden companion from the tray. A single left click on the tray icon opens the same settings menu as a companion right click.
+- The shared menu includes Reduce motion and Monitor other Claude sessions. Size presets are in Default settings. External-session monitoring remains off by default.
+- Choose On this day in the new-conversation footer for a character-voiced history introduction.
 - Double-click the companion for a character-aware AI interaction. Optional AI routes, proactive messages and break reminders make model requests.
 - Drop files or folders onto the companion, review the paths and working directory, then provide a request before sending. The eating animation does not delete the originals.
 

@@ -32,6 +32,16 @@ try {
             $hashes[$relative]=(Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
         }
     }
+    $flightFiles=@('artifact-wings.png','artifact-platform.png') |
+        Where-Object { Test-Path -LiteralPath (Join-Path $inputRoot $_) -PathType Leaf }
+    if(@($flightFiles).Count -gt 1){throw 'Use one flight artwork file per character.'}
+    foreach($flight in $flightFiles){
+        $source=Join-Path $inputRoot $flight
+        if((Get-Item -LiteralPath $source).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Linked flight artwork is not allowed.'}
+        $target=Join-Path $staging $flight
+        Copy-Item -LiteralPath $source -Destination $target
+        $hashes[$flight]=(Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+    }
     $characterProfile | Add-Member -MemberType NoteProperty -Name files -Value $hashes -Force
     [IO.File]::WriteAllText((Join-Path $staging 'character.json'),($characterProfile | ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false))
     & (Join-Path $PSScriptRoot 'ValidateCharacterPack.ps1') -PackDirectory $staging

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 using System;
 using System.Drawing;
 using System.Windows.Forms;
@@ -7,10 +7,10 @@ namespace AgentPal
 {
     internal static class SectHallLayout
     {
-        internal const float WorkstationWidth=220,WorkstationHeight=270;
+        internal const float WorkstationWidth=280,WorkstationHeight=330;
         private static int Margin(int width,float unit){return Math.Min(width/4,(int)Math.Max(12*unit,Math.Min(80*unit,width*.055)));}
         private static int Columns(int width,int count,float unit)
-        {return Math.Max(1,Math.Min(Math.Min(4,count),(int)((width-2*Margin(width,unit))/(WorkstationWidth*.7f*unit))));}
+        {float minimum=count<=4?.55f:.7f;return Math.Max(1,Math.Min(Math.Min(4,count),(int)((width-2*Margin(width,unit))/(WorkstationWidth*minimum*unit))));}
         internal static Size CanvasSize(Size viewport,int count,float unit)
         {
             int width=Math.Max(1,viewport.Width),height=Math.Max(1,viewport.Height);
@@ -19,7 +19,8 @@ namespace AgentPal
                 int columns=Columns(width,count,unit),rows=(count+columns-1)/columns;
                 // Scrolling is a fallback for dense sects, not a permanent
                 // 680px scene that overrides the size of every window.
-                height=Math.Max(height,(int)Math.Ceiling((rows*WorkstationHeight*.7f*unit+32*unit)/.68));
+                float minimum=count<=4?.55f:.7f;
+                height=Math.Max(height,(int)Math.Ceiling((rows*WorkstationHeight*minimum*unit+32*unit)/.68));
             }
             return new Size(width,height);
         }

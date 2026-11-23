@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+﻿# SPDX-License-Identifier: Apache-2.0
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $version = [IO.File]::ReadAllText((Join-Path $projectRoot 'VERSION')).Trim()
@@ -12,11 +12,11 @@ foreach ($path in @('src/DesktopTasks/AgentPal/Program.cs','src/DesktopTasks/Age
 $installer = [IO.File]::ReadAllText((Join-Path $projectRoot 'src/DesktopTasks/AgentPal.Installer/Program.cs'))
 if ([regex]::Match($installer, 'const string Version = "([0-9.]+)"').Groups[1].Value -ne $version) { throw 'Installer constant disagrees with VERSION' }
 $changelog = [IO.File]::ReadAllText((Join-Path $projectRoot 'CHANGELOG.md'))
-if ($changelog -notmatch ('(?m)^##[ \t]+' + [regex]::Escape($version) + '(?:[ \t]|$)')) { throw ('Changelog entry missing for '+$version) }
+if ($changelog -notmatch ('(?m)^##[ \t]+' + [regex]::Escape($version) + '(?:[ \t\r]|$)')) { throw ('Changelog entry missing for '+$version) }
 $ignored = [IO.File]::ReadAllText((Join-Path $projectRoot '.gitignore'))
 $defaultReadme = [IO.File]::ReadAllText((Join-Path $projectRoot 'README.md'))
 $chineseReadme = [IO.File]::ReadAllText((Join-Path $projectRoot 'README.zh-CN.md'))
-if (-not $defaultReadme.Contains('[简体中文](README.zh-CN.md)') -or -not $chineseReadme.Contains('[English](README.md)')) { throw 'README language navigation missing' }
+if ($defaultReadme -notmatch '(?:\]\(|href=")README\.zh-CN\.md' -or $chineseReadme -notmatch '(?:\]\(|href=")README\.md') { throw 'README language navigation missing' }
 if ($defaultReadme -ne [IO.File]::ReadAllText((Join-Path $projectRoot 'README.en.md'))) { throw 'English README compatibility entry is stale' }
 foreach ($file in Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/DesktopTasks') -Recurse -Filter '*.cs' -File) {
     $source = [IO.File]::ReadAllText($file.FullName)
@@ -24,7 +24,7 @@ foreach ($file in Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/Deskto
         if ($match.Groups[1].Value -notmatch '^AgentPal(?:\.[A-Za-z_][A-Za-z0-9_]*)*$') { throw ('Unexpected application namespace: '+$file.Name) }
     }
 }
-foreach ($script in @('BuildOriginalCharacters.cs','BuildAppIcon.cs','PublicFiles.ps1','TestRepository.ps1','ExportOpenSource.ps1','WalkingPreview.js','BuildReminderPreviews.cs','BuildReminderPreviews.ps1','BuildReadmeMedia.cs','BuildReadmeMedia.ps1','CharacterPackTool.cs','ValidateCharacterPack.ps1','ExportCharacterPack.ps1')) {
+foreach ($script in @('BuildOriginalCharacters.cs','BuildOriginalCharacters.Custom.cs','BuildAppIcon.cs','PublicFiles.ps1','TestRepository.ps1','ExportOpenSource.ps1','WalkingPreview.js','BuildReminderPreviews.cs','BuildReminderPreviews.ps1','BuildReadmeMedia.cs','BuildProductMedia.cs','BuildReadmeMedia.ps1','CharacterPackTool.cs','ValidateCharacterPack.ps1','ExportCharacterPack.ps1')) {
     if (-not (Test-Path -LiteralPath (Join-Path $projectRoot ('tools/'+$script)))) { throw ('Required build file absent: '+$script) }
     if ($ignored -match '(?m)^/tools/\*\s*$' -and -not $ignored.Contains('!/tools/'+$script)) { throw ('Required tool ignored by Git: '+$script) }
 }
@@ -51,7 +51,7 @@ foreach ($name in @('docs/CHARACTER-CUSTOMIZATION.md','docs/CHARACTER-PACKS.md',
         if ($target -and -not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $path) $target))) { throw ('Broken contributor documentation link: '+$name+' -> '+$target) }
     }
 }
-foreach ($name in @('installer.png','chat-bubbles.png','hero.png','characters.png','workbench.png','walking.gif','sword-flight.gif','social-preview.png','version.svg','windows.svg','license.svg')) {
+foreach ($name in @('hero.png','folder-menu.png','folder-task.png','folder-team-task.png','scheduled-tasks.png','reminders.png','desktop-chat.png','companions.png','brand-introduction.png','workshop-handoff.gif','workshop-member-statuses.png','workshop-controls.png','scheduled-task-history.png','walking.gif','sword-flight.gif','windows.svg','license.svg','harness.svg','language.svg')) {
     $file = Get-Item -LiteralPath (Join-Path $projectRoot ('docs/images/'+$name))
     if ($file.Length -le 0 -or $file.Length -gt 5MB) { throw ('README media empty or too large: '+$name) }
 }

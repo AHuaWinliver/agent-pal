@@ -1,0 +1,11 @@
+{
+  "status": "visual review candidate only",
+  "generator": "built-in image_gen",
+  "import": "full canvas normalized to 207x405, no tight crop or recentering",
+  "scope": "anatomical left, normal view; narrow fabric flare about 20 percent",
+  "palmUv": [
+    0.6,
+    0.66
+  ],
+  "productionFileUnchanged": "normal-near.png"
+}

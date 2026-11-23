@@ -35,10 +35,12 @@ namespace AgentPal
     internal sealed class CharacterAnimationSet : IDisposable
     {
         internal Dictionary<string, List<Image>> Frames = new Dictionary<string, List<Image>>(StringComparer.OrdinalIgnoreCase);
+        internal Image Artifact;
         public void Dispose()
         {
             foreach (List<Image> frames in Frames.Values) foreach (Image image in frames) image.Dispose();
             Frames.Clear();
+            if (Artifact != null) { Artifact.Dispose(); Artifact = null; }
         }
     }
 
@@ -47,6 +49,8 @@ namespace AgentPal
         internal PetCharacter[] Characters;
         internal string[] Errors;
         internal string PreparedId;
+        internal PetCharacter RequestedSelection { get; set; }
+        internal long Generation {get;set;}
         internal CharacterAnimationSet PreparedAssets;
         public void Dispose() { if (PreparedAssets != null) { PreparedAssets.Dispose(); PreparedAssets = null; } }
     }
@@ -57,7 +61,10 @@ namespace AgentPal
         internal static readonly string[] States = { "idle", "waiting", "failed", "running", "running-left", "running-right", "waving", "review", "jumping", "punching", "eating", "wiping-mouth" };
         internal readonly string Root;
         private Dictionary<string, PetCharacter> previous = new Dictionary<string, PetCharacter>(StringComparer.OrdinalIgnoreCase);
-        private const long MaxFrameBytes = 2 * 1024 * 1024, MaxPackBytes = 64 * 1024 * 1024;
+        internal const long MaxManifestBytes = 64 * 1024, MaxFrameBytes = 2 * 1024 * 1024, MaxPackBytes = 64 * 1024 * 1024;
+        internal const int MaxPacks = 16;
+        internal const string WingsFile = "artifact-wings.png", PlatformFile = "artifact-platform.png";
+        internal const int MaxArtifactEdge = 512;
 
         internal CharacterPackCatalog(string root)
         { Root = Path.GetFullPath(root); Directory.CreateDirectory(Root); CheckPath(Root); }
@@ -71,7 +78,10 @@ namespace AgentPal
             return Array.IndexOf(new[] { "lumen", "nova", "ribbon", "coco", "dawn", "pebble", "slate" }, id) >= 0;
         }
 
-        private static void CheckPath(string path)
+        internal static bool ValidId(string id)
+        { return id != null && Regex.IsMatch(id, @"\A[a-z][a-z0-9-]{2,47}\z") && !ReservedId(id); }
+
+        internal static void CheckPath(string path)
         {
             // Check ancestors as well: an innocent-looking child may be beneath a junction.
             string cursor = Path.GetFullPath(path);
@@ -82,7 +92,7 @@ namespace AgentPal
             }
         }
 
-        private static byte[] ReadBytes(string path, long limit)
+        internal static byte[] ReadBytes(string path, long limit)
         {
             CheckPath(path);
             using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
@@ -98,6 +108,12 @@ namespace AgentPal
         private static uint BigEndian(byte[] data, int offset)
         { return ((uint)data[offset] << 24) | ((uint)data[offset + 1] << 16) | ((uint)data[offset + 2] << 8) | data[offset + 3]; }
 
+        internal static CharacterPackManifest ParseManifest(byte[] data)
+        {
+            var serializer = new JavaScriptSerializer { MaxJsonLength = (int)MaxManifestBytes, RecursionLimit = 16 };
+            return serializer.Deserialize<CharacterPackManifest>(new UTF8Encoding(false, true).GetString(data).TrimStart('\uFEFF'));
+        }
+
         internal static PetCharacter ReadPack(string directory, bool loadImages, out CharacterAnimationSet assets)
         {
             assets = new CharacterAnimationSet();
@@ -105,11 +121,10 @@ namespace AgentPal
             {
                 directory = Path.GetFullPath(directory); CheckPath(directory);
                 string manifestPath = Path.Combine(directory, "character.json");
-                byte[] metadata = ReadBytes(manifestPath, 64 * 1024);
-                var serializer = new JavaScriptSerializer { MaxJsonLength = 64 * 1024, RecursionLimit = 16 };
-                CharacterPackManifest m = serializer.Deserialize<CharacterPackManifest>(new UTF8Encoding(false, true).GetString(metadata).TrimStart('\uFEFF'));
+                byte[] metadata = ReadBytes(manifestPath, MaxManifestBytes);
+                CharacterPackManifest m = ParseManifest(metadata);
                 if (m == null || m.schemaVersion != 1) throw new InvalidDataException("不支持的角色资源格式版本。");
-                if (m.id == null || !Regex.IsMatch(m.id, @"^[a-z][a-z0-9-]{2,47}$") || ReservedId(m.id) || !String.Equals(m.id, Path.GetFileName(directory), StringComparison.OrdinalIgnoreCase))
+                if (!ValidId(m.id) || !String.Equals(m.id, Path.GetFileName(directory), StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("角色 id 必须与文件夹同名，且不能占用内置角色或历史兼容名称。");
                 if (m.version == null || m.version.Length > 32 || !Regex.IsMatch(m.version, @"^\d+\.\d+\.\d+$")) throw new InvalidDataException("角色 version 应为三段版本号。");
                 if (String.IsNullOrWhiteSpace(m.name) || m.name.Length > 20 || m.name.IndexOfAny(new[] { '\r', '\n', '\0' }) >= 0 || String.IsNullOrWhiteSpace(m.persona) || m.persona.Length > 4000)
@@ -119,7 +134,9 @@ namespace AgentPal
                 if (m.canvasWidth != 384 || m.canvasHeight != 416 || Single.IsNaN(m.mouthX) || Single.IsInfinity(m.mouthX) || Single.IsNaN(m.mouthY) || Single.IsInfinity(m.mouthY) || m.mouthX <= 0 || m.mouthX >= 1 || m.mouthY <= 0 || m.mouthY >= 1)
                     throw new InvalidDataException("画布必须为384×416，嘴部位置必须在0与1之间。");
                 if (Array.IndexOf(new[] { "command", "beam", "warning", "stone" }, m.reminderStyle) < 0) throw new InvalidDataException("请选择支持的角色演绎样式。");
-                if (m.files == null || m.files.Count != 240) throw new InvalidDataException("请用导出工具生成完整的240帧SHA256清单。");
+                string artifactFile = ArtifactFile(m.files);
+                if (m.files == null || m.files.Count != (artifactFile == null ? 240 : 241))
+                    throw new InvalidDataException("请用导出工具生成完整的240帧SHA256清单。");
                 foreach (string state in States) for (int f = 0; f < FrameCount(state); f++)
                 {
                     string expected;
@@ -136,13 +153,25 @@ namespace AgentPal
                 foreach (string child in Directory.GetDirectories(directory))
                     if (Array.IndexOf(States, Path.GetFileName(child)) < 0) throw new InvalidDataException("不支持的资源子目录：" + Path.GetFileName(child));
                 foreach (string file in Directory.GetFiles(directory))
-                    if (!String.Equals(Path.GetFileName(file), "character.json", StringComparison.OrdinalIgnoreCase) && !String.Equals(Path.GetFileName(file), "README.md", StringComparison.OrdinalIgnoreCase) && !String.Equals(Path.GetFileName(file), "LICENSE.txt", StringComparison.OrdinalIgnoreCase))
+                    if (!String.Equals(Path.GetFileName(file), "character.json", StringComparison.OrdinalIgnoreCase) && !String.Equals(Path.GetFileName(file), "README.md", StringComparison.OrdinalIgnoreCase) && !String.Equals(Path.GetFileName(file), "LICENSE.txt", StringComparison.OrdinalIgnoreCase) &&
+                        !String.Equals(Path.GetFileName(file), artifactFile, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidDataException("资源包只允许角色配置、说明、许可与动作PNG。");
 
                 long total = metadata.Length;
                 using (SHA256 hash = SHA256.Create())
                 {
                     hash.TransformBlock(metadata, 0, metadata.Length, metadata, 0);
+                    if (artifactFile != null)
+                    {
+                        byte[] data = ReadBytes(Path.Combine(directory, artifactFile), MaxFrameBytes);
+                        using (SHA256 artifactHash = SHA256.Create())
+                            if (!String.Equals(BitConverter.ToString(artifactHash.ComputeHash(data)).Replace("-", ""),
+                                m.files[artifactFile], StringComparison.OrdinalIgnoreCase))
+                                throw new InvalidDataException(artifactFile + " 校验失败。");
+                        total += data.Length;
+                        hash.TransformBlock(data, 0, data.Length, data, 0);
+                        assets.Artifact = ReadArtifactPng(data, loadImages);
+                    }
                     foreach (string state in States)
                     {
                         string folder = Path.Combine(directory, state); CheckPath(folder);
@@ -184,13 +213,55 @@ namespace AgentPal
                         }
                     }
                     hash.TransformFinalBlock(new byte[0], 0, 0);
-                    byte[] check = ReadBytes(manifestPath, 64 * 1024);
+                    byte[] check = ReadBytes(manifestPath, MaxManifestBytes);
                     if (!Equal(metadata, check)) throw new IOException("角色配置正在更新，请完成复制后重试。");
                     return new PetCharacter { Id = m.id, Name = m.name, Persona = m.persona, Quotes = m.quotes, MouthX = m.mouthX, MouthY = m.mouthY,
-                        ReminderStyle = m.reminderStyle, ResourceRoot = directory, ResourceRevision = BitConverter.ToString(hash.Hash).Replace("-", "") };
+                        ReminderStyle = m.reminderStyle, ResourceRoot = directory, ArtifactResourceFile = artifactFile,
+                        ResourceRevision = BitConverter.ToString(hash.Hash).Replace("-", "") };
                 }
             }
             catch { assets.Dispose(); assets = null; throw; }
+        }
+
+        private static string ArtifactFile(Dictionary<string, string> files)
+        {
+            if (files == null) return null;
+            bool wings = files.ContainsKey(WingsFile), platform = files.ContainsKey(PlatformFile);
+            if (wings && platform) throw new InvalidDataException("一个角色包只能选择一种灵器。");
+            return wings ? WingsFile : platform ? PlatformFile : null;
+        }
+
+        internal static Image ReadArtifactPng(byte[] data, bool loadImage)
+        {
+            if (data.Length < 33 || BigEndian(data, 0) != 0x89504e47 || BigEndian(data, 4) != 0x0d0a1a0a ||
+                BigEndian(data, 8) != 13 || BigEndian(data, 12) != 0x49484452 || data[24] != 8 || data[25] != 6 ||
+                BigEndian(data, 16) < 1 || BigEndian(data, 16) > MaxArtifactEdge ||
+                BigEndian(data, 20) < 1 || BigEndian(data, 20) > MaxArtifactEdge)
+                throw new InvalidDataException("灵器图片必须为不超过512×512的透明 PNG。");
+#if AGENT_PAL_LINUX
+            using (var png = SkiaSharp.SKData.CreateCopy(data))
+            using (var codec = SkiaSharp.SKCodec.Create(png))
+            {
+                if (codec == null || codec.EncodedFormat != SkiaSharp.SKEncodedImageFormat.Png)
+                    throw new InvalidDataException("灵器图片无法解码。");
+                using (var decoded = new SkiaSharp.SKBitmap(codec.Info))
+                    if (codec.GetPixels(decoded.Info, decoded.GetPixels()) != SkiaSharp.SKCodecResult.Success)
+                        throw new InvalidDataException("灵器图片无法解码。");
+            }
+            if (!loadImage) return null;
+            using (var stream = new MemoryStream(data, false)) return new Image(stream);
+#else
+            using (var stream = new MemoryStream(data, false))
+            using (Image image = Image.FromStream(stream, false, true))
+            {
+                if (image.RawFormat.Guid != ImageFormat.Png.Guid || !Image.IsAlphaPixelFormat(image.PixelFormat))
+                    throw new InvalidDataException("灵器图片无法解码。");
+                var detached = new Bitmap(image);
+                if (loadImage) return detached;
+                detached.Dispose();
+                return null;
+            }
+#endif
         }
 
         private static bool Equal(byte[] a, byte[] b)
@@ -209,7 +280,7 @@ namespace AgentPal
                 {
                     string id = Path.GetFileName(folder);
                     if (id.StartsWith(".", StringComparison.Ordinal)) continue; // Authors stage a complete pack before renaming it.
-                    if (++count > 16) { errors.Add("最多同时扫描16个外置角色，请移出多余目录。"); break; }
+                    if (++count > MaxPacks) { errors.Add("最多同时扫描16个外置角色，请移出多余目录。"); break; }
                     try
                     {
                         CharacterAnimationSet ignored; PetCharacter character = ReadPack(folder, false, out ignored); ignored.Dispose();

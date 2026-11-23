@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 // Documentation compositions use existing character art and real, isolated UI
 // controls. They never submit prompts, start task timers, or call a model.
 using System;
@@ -47,7 +47,11 @@ internal static class BuildReadmeMedia
             try
             {
                 for (int i = 0; i < 4; i++) portraits[i] = Image.FromFile(Path.Combine(CharacterRoot(assets, i), "idle", "00.png"));
-                Hero(output, portraits);
+                string brandIcon=Path.Combine(Directory.GetParent(Path.GetFullPath(assets)).FullName,"agent-pal-brand-v2.ico");
+                using(var icon=File.Exists(brandIcon)?new Icon(brandIcon,new Size(128,128)):null)
+                using(var mark=icon==null?null:icon.ToBitmap())Hero(output,portraits,mark);
+                if(args.Length>3&&args[3]=="--cover-only")return 0;
+                if(args.Length>3&&args[3]=="--settings-only"){Settings(output);return 0;}
                 Workbench(output);
                 Settings(output);
                 Hall(output);
@@ -56,6 +60,7 @@ internal static class BuildReadmeMedia
                 Sword(assets, output, 640, 360);
                 if (new FileInfo(Path.Combine(output, "sword-flight.gif")).Length > 5 * 1024 * 1024) Sword(assets, output, 560, 315);
                 CharacterGallery(output, portraits);
+                BuildProductMedia.Render(output);
                 foreach (string file in Directory.GetFiles(output))
                     if (new FileInfo(file).Length > 5 * 1024 * 1024) throw new InvalidDataException("README media exceeds repository budget: " + Path.GetFileName(file));
                 Console.WriteLine("PASS README media: cover, social preview, real-control demo, 24-frame gait and sword-flight loop; no CLI/model calls.");
@@ -106,53 +111,30 @@ internal static class BuildReadmeMedia
         g.DrawImage(source, destination, crop, GraphicsUnit.Pixel);
     }
 
-    private static void Hero(string output, Image[] portraits)
+    private static void Hero(string output, Image[] portraits, Image productMark)
     {
-        using (Bitmap image = new Bitmap(1600, 840, PixelFormat.Format24bppRgb))
-        using (Graphics g = Graphics.FromImage(image))
+        string reference=Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"..","art","branding","preview-cover-base.png"));
+        using(var original=Image.FromFile(reference))
+        using(var image=new Bitmap(original.Width,original.Height,PixelFormat.Format24bppRgb))
+        using(var g=Graphics.FromImage(image))
         {
-            Quality(g);
-            using (LinearGradientBrush background = new LinearGradientBrush(new Point(0, 0), new Point(1600, 840), Paper, Color.FromArgb(226, 239, 232)))
-                g.FillRectangle(background, 0, 0, image.Width, image.Height);
-            using (Pen ring = new Pen(Color.FromArgb(42, 99, 131, 111), 1.5f))
+            Quality(g);g.DrawImageUnscaled(original,0,0);
+            // Keep the preview's original illustration and layout. Only the
+            // product name/mark and companion-count text are updated.
+            using(var background=new LinearGradientBrush(new Point(0,0),new Point(1600,840),Paper,Color.FromArgb(226,239,232)))
+                g.FillRectangle(background,new Rectangle(58,140,680,127));
+            if(productMark!=null)g.DrawImage(productMark,new Rectangle(68,157,94,94));
+            if(BrandAssets.Wordmark!=null)g.DrawImage(BrandAssets.Wordmark,new Rectangle(182,154,535,125));
+            else Text(g,"AgentPal",94,Ink,62,142,true);
+            Panel(g,new RectangleF(74,420,170,46),Color.FromArgb(238,229,199),16);
+            Text(g,"6 companions",20,Ink,87,430,false);
+            image.Save(Path.Combine(output,"hero.png"),ImageFormat.Png);
+            using(var social=new Bitmap(1280,640,PixelFormat.Format24bppRgb))
+            using(var socialGraphics=Graphics.FromImage(social))
             {
-                g.DrawEllipse(ring, 765, 40, 800, 800); g.DrawEllipse(ring, 805, 80, 720, 720);
-                g.DrawArc(ring, 900, 175, 530, 530, 12, 255);
-            }
-            Panel(g, new RectangleF(68, 58, 251, 40), Color.FromArgb(224, 234, 220), 18);
-            Text(g, "AI DESKTOP COMPANION", 17, Ink, 88, 66, true);
-            Text(g, "agent-pal", 94, Ink, 62, 142, true);
-            Text(g, "AI at your side.", 39, Ink, 68, 278, true);
-            Text(g, "Companions for real work.", 26, Muted, 71, 349, false);
-            string[] chips = { "4 companions", "Claude Code", "Chat · files · tasks" };
-            int[] widths = { 170, 190, 260 }; int cursor = 74;
-            for (int i = 0; i < chips.Length; i++)
-            {
-                Panel(g, new RectangleF(cursor, 420, widths[i], 46), i == 1 ? Ink : Color.FromArgb(238, 229, 199), 16);
-                Text(g, chips[i], 20, i == 1 ? Paper : Ink, cursor + 13, 430, i == 1);
-                cursor += widths[i] + 10;
-            }
-            Panel(g, new RectangleF(74, 535, 650, 201), Color.FromArgb(253, 252, 245), 24);
-            Text(g, "Your Claude Code. Your desktop.", 23, Ink, 99, 560, true);
-            Text(g, "“Summarize these notes, then plan a follow-up.”", 18, Muted, 99, 606, false);
-            Panel(g, new RectangleF(99, 659, 578, 43), Color.FromArgb(231, 240, 230), 13);
-            Text(g, "Chat in context. Schedule work. Keep the record.", 17, Ink, 112, 668, false);
-            // Actual, unchanged runtime artwork; no external character images.
-            Portrait(g, portraits[0], new Rectangle(820, 100, 300, 300));
-            Portrait(g, portraits[1], new Rectangle(1150, 110, 300, 300));
-            Portrait(g, portraits[2], new Rectangle(820, 455, 300, 285));
-            Portrait(g, portraits[3], new Rectangle(1150, 550, 300, 210));
-            Text(g, "Qingheng", 23, Ink, 909, 415, true);
-            Text(g, "Feijian", 23, Ink, 1252, 428, true);
-            Text(g, "Cangzhi", 23, Ink, 905, 758, true);
-            Text(g, "Xiaomo", 23, Ink, 1253, 785, true);
-            Text(g, "Windows · Original companions · Apache-2.0 code", 18, Muted, 75, 782, false);
-            image.Save(Path.Combine(output, "hero.png"), ImageFormat.Png);
-            using (Bitmap social = new Bitmap(1280, 640, PixelFormat.Format24bppRgb))
-            using (Graphics s = Graphics.FromImage(social))
-            {
-                Quality(s); s.Clear(Paper); s.DrawImage(image, new Rectangle(30, 0, 1219, 640));
-                social.Save(Path.Combine(output, "social-preview.png"), ImageFormat.Png);
+                Quality(socialGraphics);socialGraphics.Clear(Paper);
+                socialGraphics.DrawImage(image,new Rectangle(30,0,1219,640));
+                social.Save(Path.Combine(output,"social-preview.png"),ImageFormat.Png);
             }
         }
     }
@@ -179,7 +161,7 @@ internal static class BuildReadmeMedia
         return instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(instance);
     }
 
-    private static Bitmap Capture(Form form)
+    internal static Bitmap Capture(Form form)
     {
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(SystemInformation.VirtualScreen.Right + 80, 0);

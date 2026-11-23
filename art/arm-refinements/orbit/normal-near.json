@@ -1,0 +1,27 @@
+{
+  "generator": "built-in image_gen",
+  "source": "normal-near-source.png",
+  "alphaBounds": [
+    1,
+    1,
+    897,
+    1754
+  ],
+  "importSize": [
+    207,
+    405
+  ],
+  "palmUv": [
+    0.6,
+    0.66
+  ],
+  "anatomicalSide": "left",
+  "frontScreenSide": "right",
+  "depthSide": "near",
+  "thumbImageSide": "left toward torso",
+  "palm": "toward torso",
+  "backOfHand": "outward",
+  "scope": "Approved Qingheng anatomical left / frontal screen-right sleeve; tailored flare, unchanged palm orientation and attachment landmarks",
+  "approvedRefinement": "candidate-normal-near.png",
+  "approvalDate": "2026-11-23"
+}

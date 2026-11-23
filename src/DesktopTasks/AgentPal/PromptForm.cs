@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace AgentPal
 {
-    internal sealed class PromptForm : Form
+    internal sealed class PromptForm : AppWindow
     {
         private readonly ChineseInputTextBox prompt = new ChineseInputTextBox();
         private readonly Label placeholder = new Label();
@@ -16,6 +16,7 @@ namespace AgentPal
         internal event Action<string, string> PromptSubmitted;
         internal event Action ActivityRequested;
         internal event Action ReminderRequested;
+        internal event Action HistoryTodayRequested;
 
         internal string WorkingDirectory
         {
@@ -31,7 +32,7 @@ namespace AgentPal
         {
             Text = "询问 Claude Code";
             Icon = AppIcon.WindowIcon;
-            ClientSize = new Size(468, 184);
+            ClientSize = new Size(468, 202);
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.Manual;
             ShowInTaskbar = false;
@@ -44,9 +45,10 @@ namespace AgentPal
                 if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); }
             };
 
-            Label brand = new Label { Text = "Claude Code", Font = UiText.Font(9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(38, 38, 36), AutoSize = true, Location = new Point(54, 13) };
-            Label local = new Label { Text = "●  本机 CLI", Font = UiText.Font(8f), ForeColor = Color.FromArgb(40, 132, 84), AutoSize = true, Location = new Point(148, 15) };
-            Button close = NewTextButton("×", new Point(12, 7), new Size(30, 28));
+            Label brand = new Label { Text = "Claude Code", Font = UiText.Font(9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(38, 38, 36), AutoSize = true, Location = new Point(16, 13) };
+            Label local = new Label { Text = "●  本机 CLI", Font = UiText.Font(8f), ForeColor = Color.FromArgb(40, 132, 84), AutoSize = true, Location = new Point(112, 15) };
+            Button close = NewTextButton("×", new Point(ClientSize.Width-42, 7), new Size(30, 28));
+            close.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             close.Name = "temporaryCloseButton";
             close.Font = new Font("Segoe UI", 13f);
             close.Click += delegate { Hide(); };
@@ -101,7 +103,10 @@ namespace AgentPal
             reminders.Click += delegate { Action handler = ReminderRequested; if (handler != null) handler(); };
             tips.SetToolTip(reminders, "设置倒计时和每日提醒");
 
-            Label hint = new Label { Text = "Enter 发送 · Shift+Enter 换行", ForeColor = Color.FromArgb(145, 145, 140), AutoSize = true, Location = new Point(302, 150), Font = UiText.Font(6.6f) };
+            Button history = NewTextButton("历史上的今天", new Point(296, 143), new Size(106, 29));
+            history.Name="HistoryTodayButton";
+            history.Click+=delegate{Action handler=HistoryTodayRequested;if(handler!=null)handler();};
+            Label hint = new Label { Text = "Enter 发送 · Shift+Enter 换行", ForeColor = Color.FromArgb(145, 145, 140), AutoSize = true, Location = new Point(16, 180), Font = UiText.Font(6.6f) };
 
             Controls.Add(brand);
             Controls.Add(local);
@@ -110,6 +115,7 @@ namespace AgentPal
             Controls.Add(directoryButton);
             Controls.Add(activity);
             Controls.Add(reminders);
+            Controls.Add(history);
             Controls.Add(hint);
             Resize += delegate { ApplyRoundedRegion(); };
             ApplyRoundedRegion();
@@ -136,7 +142,7 @@ namespace AgentPal
                 e.Graphics.DrawPath(pen, path);
         }
 
-        internal void ShowNear(Rectangle petBounds)
+        internal void ShowNear(Rectangle petBounds, bool activate = true)
         {
             Rectangle area = Screen.FromRectangle(petBounds).WorkingArea;
             int x = petBounds.Left + ((petBounds.Width - Width) / 2);
@@ -144,6 +150,7 @@ namespace AgentPal
             int y = petBounds.Bottom + 8;
             if (y + Height > area.Bottom - 8) y = petBounds.Top - Height - 8;
             Location = new Point(x, Math.Max(area.Top + 8, y));
+            if (!activate) return;
             if (!Visible) Show();
             WindowState = FormWindowState.Normal;
             Activate();

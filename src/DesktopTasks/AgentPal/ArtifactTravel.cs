@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 
 namespace AgentPal
 {
@@ -16,7 +17,8 @@ namespace AgentPal
         }
         internal static string Name(string style)
         {return style=="command"?"青霄飞剑":style=="beam"?"流光符卷":style=="warning"?"碧叶灵舟":"墨玉灵盘";}
-        internal static void Render(Graphics g,Size size,Image rider,float footRow,string id,string style,float envelope,double seconds,bool left)
+        internal static void Render(Graphics g,Size size,Image rider,float footRow,string id,string style,float envelope,double seconds,bool left,
+            Image custom = null, bool wings = false)
         {
             GraphicsState original=g.Save();
             try
@@ -27,7 +29,9 @@ namespace AgentPal
                 float p=Math.Max(0,Math.Min(1,envelope)),scale=1-.16f*p;
                 float bodyX=(384-384*scale)/2,bodyY=(-3+(float)Math.Sin(seconds*2.5)*1.5f)*p;
                 float deck=bodyY+footRow*scale;
-                if(p>.001f)
+                if (p > .001f && custom != null)
+                    DrawCustom(g, custom, wings, deck, bodyY + footRow * scale * .53f, p, seconds);
+                else if(p>.001f)
                 {
                     GraphicsState vessel=g.Save();
                     // Emerge beneath the soles without clipping the bottom of
@@ -41,6 +45,24 @@ namespace AgentPal
                 g.DrawImage(rider,new RectangleF(bodyX,bodyY,384*scale,416*scale));
             }
             finally{g.Restore(original);}
+        }
+
+        private static void DrawCustom(Graphics g, Image image, bool wings, float deck, float shoulder, float opacity, double seconds)
+        {
+            float heightLimit = wings ? 176 : Math.Max(1, 410 - deck);
+            float fit = Math.Min((wings ? 340 : 326) / (float)image.Width, heightLimit / image.Height);
+            float height = image.Height * fit;
+            float wingMotion = wings ? (float)Math.Sin(seconds * 9) * .065f * opacity : 0;
+            float width = image.Width * fit * (1 + wingMotion);
+            float y = wings ? Math.Max(4, shoulder - height * .56f + wingMotion * height * .25f) : deck;
+            var bounds = Rectangle.Round(new RectangleF((384 - width) / 2, y, width, height));
+            if (bounds.Width <= 0 || bounds.Height <= 0) return;
+            using (var attributes = new ImageAttributes())
+            {
+                attributes.SetWrapMode(WrapMode.TileFlipXY);
+                attributes.SetColorMatrix(new ColorMatrix { Matrix33 = opacity });
+                g.DrawImage(image, bounds, 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, attributes);
+            }
         }
         private static Color Tint(Color color,float alpha){return Color.FromArgb((int)(255*Math.Max(0,Math.Min(1,alpha))),color);}
         private static void DrawVessel(Graphics g,string style,float deck,float opacity,double seconds)

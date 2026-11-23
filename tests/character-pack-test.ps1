@@ -1,7 +1,9 @@
+param([string]$PayloadDirectory,[switch]$ManagementOnly)
 # SPDX-License-Identifier: Apache-2.0
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
 $payload=Join-Path $projectRoot 'build/payload'
+if($PayloadDirectory){$payload=[IO.Path]::GetFullPath($PayloadDirectory)}
 if(-not(Test-Path -LiteralPath (Join-Path $payload 'assets/idle/00.png'))){throw 'Run build.ps1 before testing live character packs.'}
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 $testExe=Join-Path $payload 'CharacterPackTests.exe'
@@ -9,9 +11,11 @@ $fixture=Join-Path ([IO.Path]::GetTempPath()) ('agent-pal-character-pack-test-'+
 New-Item -ItemType Directory -Path $fixture | Out-Null
 $sources=@(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/DesktopTasks/AgentPal') -Filter '*.cs' -File | ForEach-Object FullName)
 try {
-    & $compiler /nologo /target:exe /main:CharacterPackTests /out:$testExe /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll $sources (Join-Path $PSScriptRoot 'CharacterPackTests.cs')
+    & $compiler /nologo /target:exe /main:CharacterPackTests /out:$testExe /reference:System.dll /reference:System.Core.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll /reference:System.IO.Compression.dll $sources (Join-Path $PSScriptRoot 'CharacterPackTests.cs')
     if($LASTEXITCODE -ne 0){throw 'Character pack tests failed to compile.'}
-    & $testExe $fixture
+    $testArguments=@($fixture)
+    if($ManagementOnly){$testArguments+='--management'}
+    & $testExe @testArguments
     if($LASTEXITCODE -ne 0){throw ('Character pack tests failed; isolated diagnostics: '+$fixture)}
     & (Join-Path $projectRoot 'tools/ExportCharacterPack.ps1') -FramesDirectory (Join-Path $fixture 'export-frames/export-demo') -ProfilePath (Join-Path $projectRoot 'docs/templates/character-profile.json') -OutputRoot (Join-Path $fixture 'exported')
     & (Join-Path $projectRoot 'tools/ValidateCharacterPack.ps1') -PackDirectory (Join-Path $fixture 'exported/my-companion')

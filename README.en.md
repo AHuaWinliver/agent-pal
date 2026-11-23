@@ -1,142 +1,257 @@
-<div align="center">
+﻿<div align="center">
 
-# agent-pal
+<img src="art/branding/agentpal-mark.png" alt="AgentPal AP icon with its terminal spirit" width="96">
+<br><br>
 
-**An animated desktop companion for Claude Code.**
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="art/branding/agentpal-wordmark-inverse.svg">
+<img src="art/branding/agentpal-wordmark.svg" alt="AgentPal" width="300">
+</picture>
 
-[简体中文](README.zh-CN.md) · [Get started](#get-started) · [Features](#features) · [Create a companion](#custom-characters) · [Download](https://github.com/AHuaWinliver/agent-pal/releases)
+<p><strong>Give your agents a place on your desktop.</strong></p>
+<p>A visual AI companion workspace for Windows, powered by your existing Claude Code.</p>
 
-<img src="docs/images/hero.png" alt="agent-pal's four original cultivation-inspired desktop companions" width="100%">
+<p>
+<a href="LICENSE"><img src="docs/images/license.svg" alt="License: Apache-2.0"></a>
+<img src="docs/images/windows.svg" alt="Windows 10 and 11">
+<img src="docs/images/harness.svg" alt="Integration: Claude Code">
+<img src="docs/images/language.svg" alt="English and Simplified Chinese">
+</p>
+
+<p><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
+<p><a href="https://github.com/AHuaWinliver/agent-pal/releases">Download for Windows</a> · <a href="#get-started">Get started</a> · <a href="#make-it-yours">Create a companion</a> · <a href="#contribute">Contribute</a></p>
 
 </div>
 
-Chat beside one of four animated companions, drop a file into a Claude Code conversation, or schedule recurring work. For tasks that need several roles, set up a team and follow each agent's progress and handoffs in the workshop hall.
+![AgentPal: animated desktop companions for your Claude Code workflow](docs/images/hero.png)
+
+**AgentPal brings desktop companionship and useful agent work together.** Talk with an animated companion, assign a task from its folder, schedule recurring work, set a local reminder, or import a character of your own. Each companion uses the Claude Code executable and settings you choose; progress stays visible in conversations and run records.
+
+**Built for people who already use Claude Code and want a more approachable desktop workflow.** Use one companion for everyday assistance or bind different profiles to specialist companions. You keep the CLI, tools and service configuration you already use.
+
+Six companions are included: **Qingheng, Feijian, Cangzhi, Wukong, Bailong and Xiaomo**. Add your own character packs without reinstalling.
+
+| When you want to… | AgentPal gives you… |
+| --- | --- |
+| Review a project without typing its path again | A folder-menu task sent to a chosen companion or saved team |
+| Use different setups for different work | Per-companion executables, settings and saved task history |
+| Turn a recurring request into a routine | Editable weekday schedules, isolated task history and local reminders |
+| Make the workflow feel personal | Animated companions, per-companion profiles and importable artwork |
+
+**Current integration: Claude Code.** AgentPal is a desktop interface and orchestration layer; AI execution is provided by your configured CLI and service. Other agent harnesses are a future direction, not a supported integration in this release.
+
+*Screenshots show the application with illustrative tasks and replies. Agent collaboration is still being refined; its current scope is described in the collaboration section.*
+
+## Explore AgentPal
+
+| Start with | What you can do |
+| --- | --- |
+| [Folder shortcuts](#start-where-your-files-are) | Assign work to a companion or saved team from the current folder |
+| [Agent collaboration · experimental](#work-together-see-what-happens) | Explore team batches, dependencies and recorded handoffs |
+| [Conversations](#keep-the-conversation-close) | Read structured replies, inspect tool activity and send files |
+| [Companion profiles](#a-setup-for-each-pal) | Choose each member's Claude executable and settings |
+| [Scheduled work](#make-recurring-work-routine) | Run on chosen weekdays or repeat at an interval |
+| [Reminders](#a-reminder-with-personality) | Set local reminders and countdowns with character performances |
+| [Desktop interactions](#at-home-on-your-desktop) | Drag, dock, hide, resize and travel with your companion |
+| [Custom characters](#make-it-yours) | Import packs, refresh resources and start from three views |
 
 ## Get started
 
-1. On Windows 10 or 11, download and run `agent-pal-*-Setup.exe`. Verify the file against the published SHA256 checksum. To try the features in the current source tree, [build from source](#build-from-source). [GitHub Releases](https://github.com/AHuaWinliver/agent-pal/releases)
-2. Before using AI features, make sure `claude` starts in your terminal and connects to the service you configured. Desktop interactions and local reminders work independently.
-3. Right-click the companion and open **Default settings (默认设置)** to choose a working directory and Claude configuration. Double-click a reply bubble to continue the conversation. Use the tray menu to hide or restore the companion.
+1. **Install AgentPal.** Download the Windows installer from [Releases](https://github.com/AHuaWinliver/agent-pal/releases), check its SHA256, and choose your language and installation folder.
+2. **Connect Claude Code.** Verify that your CLI works, then open **Default settings** from the companion or tray menu. Set a working directory, Claude executable and optional JSON settings file.
+3. **Start a conversation or assign a task.** Open chat from the companion menu, or configure a folder shortcut and send a request from File Explorer.
 
-[Setup guide](docs/GETTING-STARTED.md) · [Changelog](CHANGELOG.md)
+Try a small first task: **“Review this folder and suggest three next steps. Ask before changing files.”** To try the desktop experience first, choose a companion and set a local reminder; no model connection is required for those interactions.
+
+AgentPal connects to your existing CLI; it does not include Claude Code, a model or credentials. AI access, tool permissions and usage follow your configured service. Desktop interactions and local reminders work independently.
+
+[Installation and first conversation →](docs/GETTING-STARTED.md)
+
+## Start where your files are
+
+Right-click a folder, its background or the desktop and choose **Send Agent Pal task**. Review the current path, enter your request, and confirm. The selected companion opens the **native Claude Code CLI** in that folder with its bound executable and settings.
+
+- **One binding, one click.** A single enabled binding opens its task directly; multiple bindings offer a companion list with thumbnails.
+- **Your recurring workflows.** Name your shortcuts, prefill common requests, and bind each shortcut to a companion.
+- **A team in the same menu.** Bind a saved Agent team to a shortcut. Each confirmation starts an independent batch with its own agent processes, sessions and run record.
+- **A profile for each pal.** Give different companions different executables or settings, with global defaults for everything else.
+
+**1. Choose a companion or team from the menu.**
+
+![The configured Send Agent Pal task menu, with companion portraits and an Agent team entry](docs/images/folder-menu.png)
+
+*The image shows AgentPal's real in-app menu preview. Windows 11 main-menu availability depends on shell registration.*
+
+**2. Review the current folder, enter a task, and send.**
+
+<img src="docs/images/folder-task.png" alt="Task window showing the selected companion, current folder and editable request" width="640">
+
+For a team shortcut, the same confirmation starts a new independent batch using the saved roles and dependencies.
+
+<img src="docs/images/folder-team-task.png" alt="Confirm a task for the saved team in the current folder" width="640">
+
+Windows 11 main-menu integration requires the signed shell component and a trusted signing identity. A compatibility menu is also available; on Windows 11 it appears under **Show more options**. See the [native-menu setup](docs/NATIVE-MENUS.md) for this build's requirements.
 
 <details>
-<summary>Installer preview</summary>
+<summary>See companion and team bindings</summary>
 
-Choose English or Simplified Chinese and an installation folder while previewing the original companion animations.
-
-![agent-pal setup with language choice, destination and animated character preview](docs/images/installer.png)
+![Select individual companions or a saved Agent team for a folder shortcut](docs/images/folder-task-bindings.png)
 
 </details>
 
-<a id="features"></a>
-## Features
+[Folder shortcuts →](docs/QUICK-TASKS.md) · [Per-companion profiles →](docs/COMPANION-PROFILES.md)
 
-### Desktop chat and files
+## Work together, see what happens
 
-Double-click a reply bubble to open the chat beneath your companion. Your messages appear on the right and replies on the left. You can select and copy text or drag the chat header to move the window and companion together. Drop a file or folder onto the companion, then confirm the request and working directory before sending it to Claude Code.
+**Experimental — still being refined.** Team workflows and recovery need further real-world validation. Start with small, supervised tasks and review the run records.
 
-![agent-pal's left and right chat bubbles and reply field](docs/images/chat-bubbles.png)
+Define roles, assign tasks and express dependencies in the **Agent workspace**. Start with the four-role planner, implementer, reviewer and verifier preset, or build a team around your own workflow.
 
-### Scheduled tasks and run history
+![Independent run batches and Agent workspace execution controls](docs/images/agent-batches.png)
 
-Open **Claude Code scheduled tasks (Claude Code 定时任务)** from the companion menu. Enter a request and working directory, then choose a daily, weekly or interval schedule. Choose a background or terminal mode and decide whether to skip or start a run while the previous one is still active.
+![Animated companions and a recorded handoff in the experimental Agent workspace](docs/images/workshop-handoff.gif)
 
-Scheduled output appears in **Run history (运行情况)**, separate from regular chat. Double-click a record to follow captured output or read the saved task and reply.
+Each submission reuses the saved roles and task graph, with your request as its shared objective. Multiple batches can run at once; choose a **Run batch** to inspect, pause or stop it independently.
 
-<a id="scheduled-task-history"></a>
+Independent tasks can run concurrently with **1–8 worker slots**; dependent tasks wait for their prerequisites. Follow each member's latest reply, inspect tool output, and keep handoff evidence with the run. Failed tasks can pass to another member, with a limit of three total attempts. Pause dispatch when you need to intervene, or set the overall time limit to **0** for unlimited duration.
 
-![Scheduled-task history and the saved Claude reply opened by double-clicking a row](docs/images/scheduled-task-history.png)
+Working companions walk near their desks and browse reports. Recorded handoffs bring them together. The scene uses the original desktop artwork, resizes with the window, and respects **Reduce motion**.
 
-### Events and multi-agent teams
+<details>
+<summary>See member status and execution controls</summary>
 
-Open **Event planning / Team workshop (事件规划 / 门派协作)** to schedule an event or create a team. Start with Qingheng as planner, Feijian as implementer, Cangzhi as reviewer and Xiaomo as verifier, or define your own roles, working directories and dependencies.
+Every member keeps a portrait, state and latest update in the run view. Select a member to follow its transcript; queued and unassigned members stay visible too.
 
-The hall uses the desktop companions' original animation frames and scales them with the window. Light pulses show recorded handoffs. Select a team member to see output and handoff summaries. Scheduled events ask for confirmation before execution. [Workshop guide](docs/WORKSHOP.md) · [Companion roles](docs/COMPANION-ROLES.md)
+![Responsive member cards with portraits, states and latest updates](docs/images/workshop-member-statuses.png)
 
-<a id="sect-hall"></a>
+Worker slots, overall and per-step limits, pause controls and recovery settings are managed with the team.
 
-![Four companions at their workstations with status and handoff information](docs/images/sect-hall.png)
+![Independent batch selection, controls and the Agent workspace](docs/images/agent-batches.png)
 
-### Claude settings for each companion
+</details>
 
-Open **Default settings → Companions** in the separate settings window. Choose a Claude executable and JSON settings file globally or per companion. When creating a task, choose **Run as**; its saved owner determines the profile, independently of the companion currently on your desktop. The task overview shows all companions with their avatars. Settings also include English / 简体中文, working directory and docked opacity. [Profiles and task ownership](docs/COMPANION-PROFILES.md)
+[Agent workspace guide →](docs/WORKSHOP.md) · [Default roles →](docs/COMPANION-ROLES.md)
 
-<a id="claude-settings"></a>
+## Keep the conversation close
 
-![The separate settings window with a companion-specific Claude executable and JSON profile](docs/images/claude-settings.png)
+Chat in left/right bubbles beneath your companion, with portraits and structured replies: headings, lists, code blocks and expandable tool activity. Select and copy replies, drop in a file or folder for review, and drag the chat header to move the window and companion together.
 
-*UI images use demonstration data.*
+<img src="docs/images/desktop-chat.png" alt="An English conversation with a structured reply and collapsible tool activity" width="760">
 
-<a id="desktop-motion"></a>
-### Desktop interactions and reminders
+Conversations stay grouped by companion, including proactive messages. Scheduled tasks keep their own history. Docked chat follows the companion's opacity, and the shared tray menu lets you restore a hidden companion or reduce motion. Companion size is in **Default settings**: 75%, 100% and 125%, with a compact 100% default.
 
-Each companion has its own animations and expressions. Steps follow the cursor's speed while dragging. Companions can dock at the screen edge and ride their own artifacts on long roaming routes.
+Drop files and folders onto the companion, review the selected paths and confirm your request. The **On this day** action is available in the new-conversation footer. Optional proactive messages join the same companion's conversation.
 
-![Walking loops for all four companions](docs/images/walking.gif)
+[Chat and interaction guide →](docs/CHAT-UI.md)
 
-![The four companions riding their artifacts in both directions](docs/images/artifact-travel.png)
+## A setup for each pal
 
-Set a daily or weekly reminder, or start a countdown. Scheduled reminders can play a character-specific performance or show a popup. Countdowns use a popup. Below is Qingheng's sword flight, which you can dismiss with **Esc**. [Performance guide](docs/REMINDER-PERFORMANCES.md)
+Choose global defaults, then override the Claude executable and JSON settings for individual companions. Scheduled tasks use their saved owner; Agent teams use each member's companion profile. Settings open in a separate window and include language, working directory and docked opacity.
 
-<img src="docs/images/sword-flight.gif" alt="Qingheng summons and rides a flying sword with a translucent wake" width="640">
+<img src="docs/images/claude-settings.png" alt="Separate settings window with per-companion Claude executable and JSON settings" width="760">
 
-<a id="custom-characters"></a>
-## Create a companion
+[Profile configuration →](docs/COMPANION-PROFILES.md)
 
-<img src="docs/images/characters.png" alt="Character art for Qingheng, Feijian, Cangzhi and Xiaomo the charcoal turtle" width="100%">
+## Make recurring work routine
 
-Import a custom pet as a self-contained folder. The app loads its animation, name, personality and reminder style while it runs.
+Edit saved tasks in place without losing run history. Hover over a task’s companion or the creation form’s companion picker to inspect its effective Claude executable and settings-file paths.
 
-1. Right-click the pet and choose **Companions → Open character pack folder**. On a fresh Windows install, this opens `%LOCALAPPDATA%\agent-pal\Characters`. The menu always opens the active folder, including a folder retained from an earlier version.
-2. Copy the whole exported folder, for example `moon-keeper`, into `Characters`. Place `character.json` directly under `moon-keeper`, alongside the animation folders.
-3. Choose **Companions → Refresh character packs**. The result lists the imported pet by name and reports which packs need attention. Reopen **Companions** and select **Moon Keeper (custom)**.
+Choose an execution companion, working directory and schedule. Run on specific weekdays at a set time, on Monday–Friday or Saturday–Sunday, or repeat every few hours on selected days. Choose whether an active run blocks the next trigger or allows a new run to start.
 
-![The Companions menu showing the imported Moon Keeper and the Open character pack folder and Refresh character packs actions](docs/images/character-pack-menu-en.png)
+<img src="docs/images/scheduled-tasks.png" alt="Scheduled task editor: Monday and Wednesday from 09:00 every two hours, background execution, owner selection and all companions' tasks" width="700">
 
-```text
-Characters/
-└── moon-keeper/
-    ├── character.json
-    ├── idle/
-    ├── running-left/
-    ├── running-right/
-    └── … other animation folders
-```
+The task window aggregates all companions with owner portraits. Choose terminal or background execution and, where supported, a target virtual desktop. Native Background requires a compatible Claude CLI.
 
-Use the [pack guide](docs/CHARACTER-PACKS.md) for the full folder layout and the checksum manifest. To update a pet in place, keep its ID and replace the pack with a complete new export. An invalid update leaves the currently loaded frames visible and reports the validation error.
+Task output stays in its own run history, separate from ordinary chat. Open a record to inspect its status and saved reply.
 
-### Author a pack
+![Scheduled runs and their saved replies, separate from ordinary chat](docs/images/scheduled-task-history.png)
 
-1. Use the [character specification](docs/templates/CHARACTER-SPEC.md) and [profile template](docs/templates/character-profile.json) to define the look, personality, quotes, art sources and reminder style.
-2. Draw transparent frames and check both walking directions, joint connections, expressions and clipping. Use opposite arm and leg motion for bipeds and diagonal alternation for quadrupeds. External characters use their own frames with built-in performance timelines.
-3. Follow the [character pack guide](docs/CHARACTER-PACKS.md) to export and load your pack. Check idle, motion, interaction and performance states on the desktop and in the offline previews.
+Schedules run while the app is running. AgentPal does not wake a sleeping or powered-off computer.
 
-To extend built-in characters, rigs or performance timelines, see the asset entry points, anchors and review checklist in the [character customization guide](docs/CHARACTER-CUSTOMIZATION.md).
+[Schedules and execution modes →](docs/SCHEDULES.md)
 
-## Build from source
+## A reminder with personality
 
-You need Windows 10 or 11, PowerShell and the system .NET Framework 4.x compiler. Clone or extract the source, then run these commands from the repository root.
+Set a reminder for Monday–Friday, Saturday–Sunday or selected weekdays, or start a quick/custom countdown. Edit an existing reminder in place. Choose a character performance or a simple notification for scheduled reminders; countdowns use a popup. Local reminders do not need a model connection.
+
+<img src="docs/images/reminders.png" alt="Reminder window with countdown presets, a custom 25-minute timer and weekday reminders" width="600">
+
+Each companion has its own full-screen performance. Qingheng takes flight on a sword; press **Esc** to dismiss the performance.
+
+<img src="docs/images/sword-flight.gif" alt="Qingheng's full-screen sword-flight reminder performance" width="760">
+
+[Reminder and performance guide →](docs/REMINDER-PERFORMANCES.md)
+
+## At home on your desktop
+
+- **Move naturally.** Drag your companion; limb motion follows drag speed. Long roaming routes use its own flying or riding artwork.
+- **Stay unobtrusive.** Dock at the screen edge, choose opacity, or hide the companion and restore it from the tray.
+- **Keep controls close.** Right-click the companion or click the tray icon for reduced motion, chat, tasks and settings. Change size in Default settings. External Claude-session monitoring is optional and off by default.
+- **Keep input steady.** Companion movement pauses while you use settings, task editors and conversation windows.
+
+![Companions travelling in both directions with their own artifacts](docs/images/artifact-travel.png)
+
+## Make it yours
+
+**Six pals. One companion spirit.** Each has its own appearance, expressions and actions.
+
+![Qingheng, Feijian, Cangzhi, Wukong, Bailong and Xiaomo, in default companion order](docs/images/companions.png)
+
+Add a character without reinstalling:
+
+- **Import a pack.** Choose **Companions → Import character pack…**, preview a ZIP, then install and switch. Collections can contain several complete characters.
+- **Copy and refresh.** Open the character pack folder, copy in a complete resource folder, then choose **Refresh character packs**.
+- **Start with three views.** The image wizard takes front, left-facing and right-facing artwork and creates a local articulated animation draft. Add a description and optional wing or riding artwork. Check the preview carefully: long clothing and hidden limbs may need hand-authored frames.
+
+**Manage companions** keeps built-ins first and imported characters last. Switch companions, delete imported resources without deleting conversations or task settings, and customize each imported companion’s trail colors. Palettes survive resource updates and restarts.
+
+<img src="docs/images/companion-manager.png" alt="Companion management with protected built-ins and imported character controls" width="760">
+
+<img src="docs/images/trail-colors.png" alt="Per-companion trail color editor with editable swatches and a live preview" width="480">
+
+Custom packs contain data and images, not executable plugins. For a finished custom character, the guides cover frame layout, joint anchors, arm/leg coordination, layer order, expressions and full-screen performances.
+
+[Pack format and image wizard →](docs/CHARACTER-PACKS.md) · [Character authoring →](docs/CHARACTER-CUSTOMIZATION.md) · [Character brief template →](docs/templates/CHARACTER-SPEC.md)
+
+## The AgentPal identity
+
+AP brings the name together. The terminal prompt connects it to the work. **The little pal** at the heart of the A gives it a companion's character.
+
+![AgentPal brand: the AP mark, terminal prompt, little pal, six pals, colors and typography](docs/images/brand-introduction.png)
+
+The wordmark uses Oxanium SemiBold, distributed under the SIL Open Font License. Brand files and font notices are in [art/branding](art/branding) and [art/fonts](art/fonts).
+
+## Build and contribute
+
+Windows 10 or 11, PowerShell and the .NET Framework 4.x compiler are required. From the repository root:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -SkipInstaller
 .\build\payload\agent-pal.exe
 ```
 
-Find the installer in `dist/` and offline animation and performance previews in `build/previews/`. Pass `-SkipInstaller` to build the app and previews only. [Development and testing guide](docs/DEVELOPMENT.md)
+The build also creates offline animation previews in `build/previews/`. Omit `-SkipInstaller` to create the installer; native shell packaging has [additional signing and tool requirements](docs/NATIVE-MENUS.md#build).
 
-## Linux port and compatibility
+The **Linux port is under development** on the `linux` branch for x86_64 and ARM64. It has a separate compatibility and validation checklist; this README's download and setup instructions describe Windows. [Linux progress →](docs/LINUX.en.md)
 
-The Linux desktop application is under development on the `linux` branch for x86_64 and ARM64, with a separate compatibility build for older system libraries. Native Ubuntu and CentOS 7 userspace checks cover Unicode chat, isolated background tasks and four-companion dependency handoffs. Chinese and emoji fonts are bundled for consistent display. Full feature migration and expanded distribution validation are ongoing. [Screenshots, test results and release checklist](docs/LINUX.en.md)
+<a id="contribute"></a>
+Original companions, animation tools, desktop fixes, tests and translations are welcome. Start with an [issue](https://github.com/AHuaWinliver/agent-pal/issues) or follow the [contribution guide](CONTRIBUTING.md). Include screenshots and English/Chinese documentation for major interface changes.
 
-![Native CentOS 7 workshop hall with isolated demonstration data](docs/images/linux-workshop.png)
+You can contribute without writing application code: test a desktop workflow, improve a translation, share a character pack you have rights to distribute, or help make the authoring guide clearer. For a first code contribution, open an issue with a small, reproducible change and its expected behavior.
 
-## Contributing
+**Want to follow the project?** Star AgentPal to keep it close, and use [Releases](https://github.com/AHuaWinliver/agent-pal/releases) for packaged updates. If you tried it, a short [bug report or feature request](https://github.com/AHuaWinliver/agent-pal/issues/new/choose) with your workflow helps shape what comes next.
 
-Original characters, animation tools, desktop fixes, tests and translations are welcome. Discuss changes in [Issues](https://github.com/AHuaWinliver/agent-pal/issues) and follow the [contribution guide](CONTRIBUTING.md). Major features include images and instructions in both READMEs.
+[Development and testing →](docs/DEVELOPMENT.md) · [Changelog →](CHANGELOG.md) · [Report a bug →](https://github.com/AHuaWinliver/agent-pal/issues)
 
-## Privacy and license
+## Privacy and licensing
 
-Your Claude Code configuration and service determine AI requests, file permissions and usage. The installer adds current-user integration hooks and backs up the Claude settings, preserving existing handlers. [Privacy and configuration](docs/PRIVACY.md) · [Security reporting](SECURITY.md)
+<details>
+<summary>Where does AgentPal fit in my setup?</summary>
 
-Code is licensed under [Apache-2.0](LICENSE). See the [asset license](ASSET-LICENSE.md) and [art provenance](art/PROVENANCE.md) for the bundled characters.
+AgentPal provides the desktop companions, request windows, local schedules and team dispatcher. Your selected Claude Code executable runs the AI work with its existing tools and configured service. You can use a cloud or intranet endpoint that already works with that CLI; AgentPal does not supply an offline model. This release supports Claude Code on Windows. Additional harnesses and the separate Linux port need their own implementation and validation.
+
+</details>
+
+Your configured Claude service determines where AI requests are sent. AgentPal stores local settings and run history; installation, upgrade and uninstall leave Claude configuration files unchanged. Native task hooks are loaded only through a private per-run settings overlay. [Privacy and configuration](docs/PRIVACY.md) · [Security reporting](SECURITY.md)
+
+Code: [Apache-2.0](LICENSE). Artwork and brand assets: see [asset licensing](ASSET-LICENSE.md), [art provenance](art/PROVENANCE.md) and the included font notices. AgentPal is an independent project and is not affiliated with Anthropic.

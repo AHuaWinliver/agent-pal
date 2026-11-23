@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 // Deterministic animation renderer for the approved, AI-assisted original art.
 // Texture sources and reviewed regions are shipped in art/rigs. No network call at build time.
 using System;
@@ -12,7 +12,7 @@ using System.Text;
 using System.Web.Script.Serialization;
 using AgentPal;
 
-internal static class BuildOriginalCharacters
+internal static partial class BuildOriginalCharacters
 {
     private static readonly string[] States={"idle","waiting","failed","running","running-left","running-right","waving","review","jumping","punching","eating","wiping-mouth"};
     private static readonly Dictionary<string,Rig> Rigs=new Dictionary<string,Rig>();
@@ -22,7 +22,11 @@ internal static class BuildOriginalCharacters
     {
         try
         {
+            if(args.Length==4&&args[0]=="--attachment-samples"){AttachmentSamples=true;args=new[]{args[1],args[2],args[3]};}
+            if(args.Length==5&&args[0]=="--proportions")
+            {ExportProportionReview(args[1],args[3],args[2],float.Parse(args[4],System.Globalization.CultureInfo.InvariantCulture));return 0;}
             if(args.Length!=3) throw new ArgumentException("Usage: BuildOriginalCharacters assets previews art/rigs");
+            LoadAnatomy(Path.GetDirectoryName(Path.GetFullPath(args[2])));
             string root=Path.GetFullPath(args[0]), previews=Path.GetFullPath(args[1]);
             Directory.CreateDirectory(root); Directory.CreateDirectory(previews);
             var metadata=new JavaScriptSerializer().Deserialize<Dictionary<string,int[][]>>(File.ReadAllText(Path.Combine(args[2],"regions.json")));
@@ -44,11 +48,17 @@ internal static class BuildOriginalCharacters
                     string characterRoot=id==0?root:Path.Combine(root,"characters",character.Id);
                     foreach(string state in States)
                     {
+                        if(!RenderState(state))continue;
                         string directory=Path.Combine(characterRoot,state); Directory.CreateDirectory(directory);
                         int n=FrameCount(state);
-                        for(int f=0;f<n;f++) using(Bitmap image=Frame(character.Id,state,f/(double)n))
-                        { image.Save(Path.Combine(directory,f.ToString("00")+".png"),ImageFormat.Png); count++; }
+                        for(int f=0;f<n;f++)
+                        {
+                            if(!RenderFrame(f))continue;
+                            customState=state;customFrame=f;
+                            using(Bitmap image=Frame(character.Id,state,f/(double)n))image.Save(Path.Combine(directory,f.ToString("00")+".png"),ImageFormat.Png);count++;
+                        }
                     }
+                    ExportAnatomyLayers(character.Id,previews);
                     GenerateExpressionPatches(characterRoot,character.Id,Rigs[character.Id]);
                     GenerateExpressionPatches(characterRoot,character.Id,SideRigs[character.Id]);
                     using(Bitmap portrait=Frame(character.Id,"idle",0))
@@ -60,7 +70,7 @@ internal static class BuildOriginalCharacters
                         { grid.DrawString(character.Name,title,ink,id*340+110,374); grid.DrawString(new[]{"青衣游修","符箓手艺人","草木药师","墨黑云纹灵龟"}[id],subtitle,ink,id*340+100,420); }
                     }
                     string relative=id==0?"../payload/assets/":"../payload/assets/characters/"+character.Id+"/";
-                    html.Append("<section><h2>"+character.Name+"</h2><canvas width='384' height='416' style='width:288px;height:312px' data-id='"+character.Id+"' data-root='"+relative+"'></canvas><p class='hint'>独立眨眼节奏 · 柔和屈肘</p></section>");
+                    html.Append("<section><h2>"+character.Name+"</h2><canvas width='384' height='416' style='width:288px;height:312px' data-id='"+character.Id+"' data-head-attachment='"+new JavaScriptSerializer().Serialize(WalkingExpressionOffsets(character.Id))+"' data-root='"+relative+"'></canvas><p class='hint'>独立眨眼节奏 · 柔和屈肘</p></section>");
                 }
                 gallery.Save(Path.Combine(previews,"characters.png"),ImageFormat.Png);
                 html.Append("</main><p><a href='performances.html'>查看四位角色专属全屏演绎 →</a></p><script src='walking-preview.js?v=foreground-arms-9'></script>");
@@ -72,11 +82,12 @@ internal static class BuildOriginalCharacters
             foreach(string name in new[]{"punch-fist","impact-center"})
                 using(Bitmap b=new Bitmap(256,256)) using(Graphics g=Graphics.FromImage(b))
                 { g.Clear(Color.Transparent); Quality(g); using(Pen p=new Pen(Color.FromArgb(145,188,158,90),4)) {g.DrawEllipse(p,40,40,176,176);g.DrawEllipse(p,59,59,138,138);} b.Save(Path.Combine(effects,name+".png"),ImageFormat.Png); }
+            File.WriteAllText(Path.Combine(previews,"wave-audit.json"),new JavaScriptSerializer().Serialize(WaveArmAudit));
             Console.WriteLine("Generated "+PetCharacter.All.Length+" cultivation companions, "+count+" frames, 48 expression patches and 2 compatibility effects.");
             return 0;
         }
         catch(Exception ex) { Console.Error.WriteLine(ex); return 1; }
-        finally { foreach(Rig rig in Rigs.Values) rig.Dispose();foreach(Rig rig in SideRigs.Values)rig.Dispose(); }
+        finally { DisposeTorsoThickness();foreach(Rig rig in Rigs.Values) rig.Dispose();foreach(Rig rig in SideRigs.Values)rig.Dispose();foreach(var arm in CustomArms.Values)arm.Dispose();CustomArms.Clear(); }
     }
     private static int FrameCount(string state) { return state=="idle"||state=="waiting"||state=="failed"?8:24; }
     private static void Quality(Graphics g)
@@ -93,6 +104,7 @@ internal static class BuildOriginalCharacters
                 if(mirror){g.TranslateTransform(384,0);g.ScaleTransform(-1,1);}
                 bool walking=state.StartsWith("running",StringComparison.Ordinal);
                 Rig rig=walking?SideRigs[id]:Rigs[id];
+                DrawCustomTail(g,rig,state,phase);
                 if(id=="pippin") Turtle(g,rig,state,phase);
                 else if(walking)ProfileHuman(g,rig,state,phase,id);
                 else Human(g,rig,state,phase,id);
@@ -115,9 +127,14 @@ internal static class BuildOriginalCharacters
         }
         GraphicsState upper=g.Save();g.TranslateTransform(sway,bob);
         g.TranslateTransform(192,260);g.RotateTransform((float)Math.Sin(t)*.45f);g.TranslateTransform(-192,-260);
-        RectangleF torso=ProfileTorsoBox(rig,id);DrawTexture(g,rig.Parts[1],torso);
-        GraphicsState head=g.Save();CompanionMotion.ApplyHeadAttachment(g,id,state,phase);
-        DrawAttachedHead(g,rig,id,0);g.Restore(head);
+        DrawWalkingBackgroundArm(g,rig,id,state,phase);
+        if(HasAnatomy(id))DrawProportionHeadLayer(g,rig,id,state,phase,0,true);
+        RectangleF torso=ProfileTorsoBox(rig,id);
+        if(HasAnatomy(id))DrawProportionTorso(g,rig.Parts[1],torso,true,id);else DrawTexture(g,rig.Parts[1],torso);
+        if(customTail)customTorsoDrawn=true;
+        GraphicsState head=g.Save();CompanionMotion.ApplyHeadAttachment(g,customCharacterId??id,state,phase);
+        if(!HasAnatomy(id))DrawAttachedHead(g,rig,id,0);g.Restore(head);
+        if(HasAnatomy(id))DrawProportionHeadLayer(g,rig,id,state,phase,0,false);
         // The head's old collar is locally excluded. The real body collar stays
         // behind the head/hair, so no second floating collar is painted over it.
         DrawWalkingForegroundArms(g,rig,id,state,phase);
@@ -125,15 +142,21 @@ internal static class BuildOriginalCharacters
     }
     private static void DrawWalkingForegroundArms(Graphics g,Rig rig,string id,string state,double phase)
     {
+        if(customTail){DrawCustomArms(g,rig,id,state,phase,1);return;}
         double t=phase*Math.PI*2;float arm=(float)ArmSwing(phase,true);
-        DrawArm(g,rig.Parts[2],CompanionMotion.WalkingShoulderAnchor(id,true),arm,state,t,true,rig.ArmAttachments[0],124);
-        DrawArm(g,rig.Parts[3],CompanionMotion.WalkingShoulderAnchor(id,false),-arm,state,t,false,rig.ArmAttachments[1],124);
+        DrawArm(g,rig.Parts[3],CalibratedWalkingShoulder(id,1),-arm,state,t,false,rig.ArmAttachments[1],124*PreviewArmScale(id));
+    }
+    private static void DrawWalkingBackgroundArm(Graphics g,Rig rig,string id,string state,double phase)
+    {
+        if(customTail){DrawCustomArms(g,rig,id,state,phase,0);return;}
+        DrawArm(g,rig.Parts[2],CalibratedWalkingShoulder(id,0),(float)ArmSwing(phase,true),state,phase*Math.PI*2,true,rig.ArmAttachments[0],124*PreviewArmScale(id));
     }
     private static RectangleF ProfileTorsoBox(Rig rig,string id)
     {
         // Preserve the new side drawing's aspect ratio; pin its opaque neck to
         // the unchanged head and keep the hem at the original walking height.
         PointF neck=CompanionMotion.WalkingNeckAnchor(id),source=CompanionMotion.WalkingTorsoNeck(id);
+        var calibration=Calibration(id);if(calibration!=null&&calibration.profile.torsoAnchorUv!=null)source=Point(calibration.profile.torsoAnchorUv);
         float height=(368-neck.Y)/(1-source.Y),width=height*rig.Parts[1].Width/rig.Parts[1].Height;
         return new RectangleF(neck.X-source.X*width,neck.Y-source.Y*height,width,height);
     }
@@ -155,25 +178,35 @@ internal static class BuildOriginalCharacters
         }
         GraphicsState upper=g.Save();g.TranslateTransform(sway,bob+breathing);
         g.TranslateTransform(192,260);g.RotateTransform(walk?(float)(Math.Sin(t)*.45):state=="failed"?2:0);g.TranslateTransform(-192,-260);
-        GraphicsState clothing=g.Save();if(walk)CompanionMotion.ApplyWalkingBody(g);
-        DrawTexture(g,rig.Parts[1],new RectangleF(86,191,212,177));
-        g.Restore(clothing);
         int head=state=="eating"&&Math.Sin(t)>-.25?6:((state=="idle"||state=="waiting")&&phase>=.75&&phase<.875?7:0);
+        if(customTail&&state=="eating")head=phase>=.25&&phase<=.67?6:0;
+        if(HasAnatomy(id))DrawProportionHeadLayer(g,rig,id,state,phase,head,true);
+        GraphicsState clothing=g.Save();if(walk)CompanionMotion.ApplyWalkingBody(g);
+        if(HasAnatomy(id))DrawProportionTorso(g,rig.Parts[1],id);
+        else DrawTexture(g,rig.Parts[1],new RectangleF(86,191,212,177));
+        g.Restore(clothing);
         GraphicsState face=g.Save();
-        CompanionMotion.ApplyHeadAttachment(g,id,state,phase);
-        DrawAttachedHead(g,rig,id,head);g.Restore(face);
-        DrawCollarLip(g,rig.Parts[1],id,walk);
+        CompanionMotion.ApplyHeadAttachment(g,customCharacterId??id,state,phase);
+        if(!HasAnatomy(id))DrawAttachedHead(g,rig,id,head);g.Restore(face);
+        if(HasAnatomy(id))DrawProportionHeadLayer(g,rig,id,state,phase,head,false);
+        else DrawCollarLip(g,rig.Parts[1],id,walk);
         DrawHumanForegroundArms(g,rig,id,state,phase);
         g.Restore(upper);g.Restore(all);
     }
     private static void DrawHumanForegroundArms(Graphics g,Rig rig,string id,string state,double phase)
     {
+        if(HasAnatomy(id)&&!customTail){DrawCalibratedNativeArms(g,rig,id,state,phase);return;}
+        if(customStaff!=null&&state=="punching"){DrawCustomStaff(g,rig,id,phase);return;}
+        if(customTail){DrawCustomArms(g,rig,id,state,phase);return;}
+        if(state=="idle"||state=="waiting"||state=="failed")
+        {DrawRelaxedNativeArm(g,rig,id,0);DrawRelaxedNativeArm(g,rig,id,1);return;}
         // Explicit user-selected layer policy: both arms are always above the
         // body, collar, face and hair. Never repaint a head/body mask over them.
         double t=phase*Math.PI*2;string armState=state=="failed"&&id=="orbit"?"failed-outward":state;
-        DrawArm(g,rig.Parts[2],CompanionMotion.ShoulderAnchor(id,true),0,armState,t,true,rig.ArmAttachments[0]);
+        if(state=="waving"||state=="wiping-mouth")DrawRelaxedNativeArm(g,rig,id,0);
+        else DrawArm(g,rig.Parts[2],CompanionMotion.ShoulderAnchor(id,true),0,armState,t,true,rig.ArmAttachments[0],customTail?128:146);
         if(state=="waving"||state=="wiping-mouth")DrawHumanGesture(g,rig,id,state,phase);
-        else DrawArm(g,rig.Parts[3],CompanionMotion.ShoulderAnchor(id,false),0,armState,t,false,rig.ArmAttachments[1]);
+        else DrawArm(g,rig.Parts[3],CompanionMotion.ShoulderAnchor(id,false),0,armState,t,false,rig.ArmAttachments[1],customTail?128:146);
     }
     internal static PointF Foot(float center,double u)
     {
@@ -183,7 +216,7 @@ internal static class BuildOriginalCharacters
         return new PointF(center-46+(float)(92*s*s*(3-2*s)),396-(float)(10*Math.Sin(Math.PI*s)));
     }
     internal static double ArmSwing(double phase,bool left)
-    { return (left?1:-1)*18*Math.Cos(phase*Math.PI*2-.16); }
+    { return CompanionMotion.RelaxedWalkingSwing(phase,left); }
     private static PointF BootPoint(BootLayout boot,PointF source,PointF sole,double phase)
     {return CompanionMotion.WalkingBootPoint(boot.Bounds,boot.Cuff,source,sole,phase);}
     private static void DrawWalkingLeg(Graphics g,Rig rig,int index,PointF hip,PointF sole,double phase)
@@ -351,6 +384,7 @@ internal static class BuildOriginalCharacters
         DrawTurtleFoot(g,rig,5,phase,walk,false,"idle");
         GraphicsState tail=g.Save();g.TranslateTransform(308,298);g.RotateTransform((float)Math.Sin(t)*4);
         DrawTexture(g,rig.Parts[8],new RectangleF(0,0,43,35));g.Restore(tail);
+        if(walk)DrawTurtleFoot(g,rig,3,phase+.5,true,false,"idle");
         DrawTexture(g,rig.Parts[1],new RectangleF(110,170+(walk?(float)Math.Cos(t*2)*.6f:0),226,178));
         DrawTurtleFoot(g,rig,4,phase+.5,walk,true,"idle");
         DrawTurtleSocketLip(g,rig,4,phase,walk);
@@ -365,7 +399,7 @@ internal static class BuildOriginalCharacters
     private static void DrawTurtleForegroundArms(Graphics g,Rig rig,string state,double phase)
     {
         bool walk=state.StartsWith("running",StringComparison.Ordinal);
-        DrawTurtleFoot(g,rig,3,phase+.5,walk,false,"idle");
+        if(!walk)DrawTurtleFoot(g,rig,3,phase+.5,false,false,"idle");
         if(state=="waving"||state=="wiping-mouth"||state=="punching")DrawTurtleGesture(g,rig,state,phase);
         else DrawTurtleFoot(g,rig,2,phase,walk,true,state);
     }
@@ -424,14 +458,14 @@ internal static class BuildOriginalCharacters
     {
         if(id=="orbit") return part==7?new[]{new PointF(.54f,.66f),new PointF(.735f,.74f)}:part==6?new[]{new PointF(.55f,.66f),new PointF(.765f,.74f)}:new[]{new PointF(.515f,.65f),new PointF(.725f,.722f)};
         if(id=="spark") return part==7?new[]{new PointF(.36f,.68f),new PointF(.615f,.59f)}:part==6?new[]{new PointF(.36f,.675f),new PointF(.615f,.565f)}:new[]{new PointF(.36f,.67f),new PointF(.60f,.58f)};
-        if(id=="moss") return part==7?new[]{new PointF(.29f,.77f),new PointF(.515f,.68f)}:part==6?new[]{new PointF(.285f,.765f),new PointF(.515f,.68f)}:new[]{new PointF(.282f,.763f),new PointF(.491f,.679f)};
+        if(id=="moss") return new[]{new PointF(.44f,.55f),new PointF(.68f,.59f)};
         return part==7?new[]{new PointF(.26f,.32f),new PointF(.69f,.46f)}:part==6?new[]{new PointF(.24f,.31f),new PointF(.69f,.47f)}:new[]{new PointF(.225f,.311f),new PointF(.68f,.46f)};
     }
     private static PointF ProfileEye(string id,int part)
     {
         if(id=="orbit")return part==7?new PointF(.785f,.635f):part==6?new PointF(.759f,.628f):new PointF(.751f,.623f);
         if(id=="spark")return part==7?new PointF(.785f,.531f):part==6?new PointF(.800f,.524f):new PointF(.794f,.531f);
-        if(id=="moss")return part==7?new PointF(.792f,.630f):part==6?new PointF(.813f,.642f):new PointF(.815f,.668f);
+        if(id=="moss")return new PointF(.76f,.55f);
         return part==7?new PointF(.281f,.353f):part==6?new PointF(.261f,.350f):new PointF(.260f,.328f);
     }
     private static RectangleF HeadBox(string id,Rig rig)
@@ -480,11 +514,13 @@ internal static class BuildOriginalCharacters
     {
         string directory=Path.Combine(root,rig.Profile?"profile-expressions":"expressions");Directory.CreateDirectory(directory);
         CreateExpressionPatches(id,rig);
+        if(rig.Profile)File.WriteAllText(Path.Combine(directory,"attachment.json"),new JavaScriptSerializer().Serialize(WalkingExpressionOffsets(id)));
         for(int i=0;i<6;i++)rig.HeadPatches[i].Save(Path.Combine(directory,(i+1).ToString("00")+".png"),ImageFormat.Png);
     }
     private static void DrawAttachedHead(Graphics g,Rig rig,string id,int expression)
     {
         GraphicsState saved=g.Save();
+        if(customTail||rig.RefinedHeads){DrawTexture(g,rig.Parts[expression==6?6:expression==7?7:0],HeadBox(id,rig));g.Restore(saved);return;}
         if(rig.Profile&&id!="pippin")using(GraphicsPath oldCollar=new GraphicsPath())
         {oldCollar.AddPolygon(CompanionMotion.WalkingOldCollar(id));g.SetClip(oldCollar,CombineMode.Exclude);}
         if(id=="pippin")DrawTurtleHead(g,rig);else DrawTexture(g,rig.Parts[0],HeadBox(id,rig));
@@ -544,7 +580,7 @@ internal static class BuildOriginalCharacters
         if(rig.HeadPatches[0]!=null)return;
         RectangleF box=HeadBox(id,rig);
         PointF[] eyes=rig.Profile?new[]{ProfileEye(id,0),ProfileEye(id,0)}:FaceEyes(id,0);
-        PointF mouth=id=="orbit"?new PointF(.625f,.79f):id=="spark"?new PointF(.52f,.74f):id=="moss"?new PointF(.40f,.818f):new PointF(.40f,.58f);
+        PointF mouth=id=="orbit"?new PointF(.625f,.79f):id=="spark"?new PointF(.52f,.74f):id=="moss"?new PointF(.54f,.70f):new PointF(.40f,.58f);
         if(rig.Profile)mouth=id=="pippin"?new PointF(.105f,.49f):id=="spark"?new PointF(.86f,.64f):id=="moss"?new PointF(.86f,.755f):new PointF(.813f,.748f);
         float mouthX=id=="pippin"?.22f:rig.Profile?.12f:.17f,mouthY=id=="pippin"?.14f:rig.Profile?.08f:.11f;
         if(rig.Profile&&id=="orbit"){mouthX=.085f;mouthY=.055f;} // Keep the nose and chin outside the mouth replacement.
@@ -611,6 +647,7 @@ internal static class BuildOriginalCharacters
     {
         internal readonly Bitmap[] Parts=new Bitmap[9];
         internal readonly bool Profile;
+        internal readonly bool RefinedHeads;
         internal readonly Bitmap[] HeadPatches=new Bitmap[6];
         internal Bitmap TurtleHead;
         internal readonly Bitmap[] WalkingLegs=new Bitmap[2];
@@ -635,6 +672,23 @@ internal static class BuildOriginalCharacters
                     byte[] bytes=new byte[data.Stride*bounds.Height];Marshal.Copy(data.Scan0,bytes,0,bytes.Length);
                     for(int p=0;p<bytes.Length;p+=4) if(bytes[p+3]<16) {bytes[p]=bytes[p+1]=bytes[p+2]=bytes[p+3]=0;}
                     Marshal.Copy(bytes,0,data.Scan0,bytes.Length);Parts[i].UnlockBits(data);
+            }
+            string refinement=Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(path)),"head-refinements",Path.GetFileNameWithoutExtension(path));
+            if(Directory.Exists(refinement))
+            {
+                int[] slots={0,6,7};string[] names={"neutral","open","blink"};
+                for(int i=0;i<slots.Length;i++)using(var source=new Bitmap(Path.Combine(refinement,(Profile?"profile-":"normal-")+names[i]+".png")))
+                {Parts[slots[i]].Dispose();Parts[slots[i]]=new Bitmap(source);}
+                // Independently cropped expression PNGs may differ by a pixel.
+                // Preserve the approved neutral silhouette and neck instead of
+                // allowing a blink/open mouth to rescale the hair or collar.
+                StabilizeRefinedHeadExpressions(Parts,Profile,Path.GetFileNameWithoutExtension(path));
+                RefinedHeads=true;
+            }
+            if(!Profile)for(int arm=0;arm<2;arm++)
+            {
+                string armFile=Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(path)),"arm-refinements",Path.GetFileNameWithoutExtension(path),arm==0?"normal-far.png":"normal-near.png");
+                if(File.Exists(armFile))using(var source=new Bitmap(armFile)){Parts[arm+2].Dispose();Parts[arm+2]=new Bitmap(source);}
             }
             if(Path.GetFileNameWithoutExtension(path)=="pippin")
             {

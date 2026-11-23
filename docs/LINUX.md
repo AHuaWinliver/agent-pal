@@ -62,9 +62,9 @@ Ubuntu x64 与 ARM64 上已通过程序构建、共享业务逻辑和原生窗�
 
 ![CentOS 7 原生门派大堂，使用隔离测试数据](images/linux-workshop.png)
 
-原生终端保留 Claude 的交互界面与 TTY 输入；定时任务按所选道友独立调用程序和配置，Background 状态与日志不进入普通聊天。当前还提供中英文独立设置窗口、用户自启动、托盘隐藏恢复，以及带角色动画预览和自定义目录的安装窗口。再次启动程序也能恢复隐藏的宠物。
+原生终端保留 Claude 的交互界面与 TTY 输入；定时任务按所选道友独立调用程序和配置，Background 状态与日志不进入普通聊天。当前还提供中英文独立设置窗口、用户自启动、托盘隐藏恢复，以及带角色动画预览和自定义目录的安装窗口。再次启动程序也能恢复隐藏的伙伴。
 
-`sh install.sh` 打开安装窗口，或使用 `sh install.sh --silent --install-dir "$HOME/.local/opt/agent-pal"` 安装到指定目录。安装逐文件校验复制内容，升级时完整保留上一安装目录，拒绝覆盖不属于本应用的非空目录。用户数据和外置角色仍位于 XDG 目录。安装前需关闭宠物，安装器不会自动结束独立 Claude 任务。托盘显示还取决于桌面环境的 StatusNotifierItem / AppIndicator 支持。
+`sh install.sh` 打开安装窗口，或使用 `sh install.sh --silent --install-dir "$HOME/.local/opt/agent-pal"` 安装到指定目录。安装逐文件校验复制内容，升级时完整保留上一安装目录，拒绝覆盖不属于本应用的非空目录。用户数据和外置角色仍位于 XDG 目录。安装前需关闭伙伴，安装器不会自动结束独立 Claude 任务。托盘显示还取决于桌面环境的 StatusNotifierItem / AppIndicator 支持。
 
 当前仍需完善 AI 路线和光轨、灵器移动、外置人物全屏演绎，以及真实目标桌面环境下的输入和窗口验证。完整功能验收仍在进行。
 

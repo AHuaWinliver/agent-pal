@@ -14,6 +14,15 @@ namespace AgentPal
             get { return String.IsNullOrEmpty(dockedEdge) ? (byte)255 : (byte)Math.Round(255 * dockOpacityPercent / 100.0); }
         }
 
+        private void SyncConversationOpacity()
+        {
+            double opacity = PetWindowAlpha / 255.0;
+            if (promptForm.Opacity != opacity) promptForm.Opacity = opacity;
+            if (replyBubble.Opacity != opacity) replyBubble.Opacity = opacity;
+            if (activityTray.Opacity != opacity) activityTray.Opacity = opacity;
+            if (quoteBubble.Opacity != opacity) quoteBubble.Opacity = opacity;
+        }
+
         private ToolStripMenuItem BuildDockOpacityMenu()
         {
             var menu = new ToolStripMenuItem("贴边不透明度");

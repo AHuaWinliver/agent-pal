@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -14,17 +14,31 @@ namespace AgentPal
         private bool petOnSelectedDesktop = true;
         private string desktopScope = "all";
         private string desktopScopeError = "";
-        private ToolStripMenuItem showPetItem, hidePetItem, desktopOneItem, desktopAllItem;
+        private ToolStripMenuItem visibilityItem, desktopOneItem, desktopAllItem;
         private Size cachedCanvasSize;
         private readonly int taskbarCreatedMessage = RegisterWindowMessage("TaskbarCreated");
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int RegisterWindowMessage(string name);
+        internal const float DefaultPetScale=.5f;
+        internal static readonly int[] PetScalePercentages={75,100,125};
+        internal static float NormalizePetScale(float scale)
+        {
+            if(Single.IsNaN(scale)||Single.IsInfinity(scale))return DefaultPetScale;
+            if(scale<DefaultPetScale*.875f)return DefaultPetScale*.75f;
+            if(scale>DefaultPetScale*1.125f)return DefaultPetScale*1.25f;
+            return DefaultPetScale;
+        }
+        internal static int PetScalePercent(float scale){return (int)Math.Round(NormalizePetScale(scale)/DefaultPetScale*100);}
+        internal static float ReadSavedPetScale(string value,int revision)
+        {
+            float scale;
+            return revision<2||!Single.TryParse(value,System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out scale)?DefaultPetScale:NormalizePetScale(scale);
+        }
 
         internal static Size PetCanvasSize(float scale)
         {
-            if (Single.IsNaN(scale) || Single.IsInfinity(scale)) scale = 0.5f;
-            scale = Math.Max(0.5f, Math.Min(1.25f, scale));
+            scale = NormalizePetScale(scale);
             return new Size((int)Math.Round(192 * scale), (int)Math.Round(208 * scale));
         }
 
@@ -75,10 +89,7 @@ namespace AgentPal
 
         private void UpdateVisibilityMenu()
         {
-            // Always provide a recovery action even if Windows cloaks the HWND
-            // while WinForms still reports Visible=true.
-            if (showPetItem != null) showPetItem.Enabled = true;
-            if (hidePetItem != null) hidePetItem.Enabled = !userHidden;
+            if(visibilityItem!=null){visibilityItem.Text=UiLanguage.Text(userHidden?"显示伙伴":"隐藏伙伴");visibilityItem.Enabled=true;}
             if (desktopOneItem != null) desktopOneItem.Checked = desktopScope == "first";
             if (desktopAllItem != null) desktopAllItem.Checked = desktopScope == "all";
         }
@@ -165,7 +176,7 @@ namespace AgentPal
                 try
                 {
                     if (!VirtualDesktopService.IsWindowOnCurrentDesktop(Handle))
-                        tray.ShowBalloonTip(2500, Program.ProductName, "宠物已显示在桌面 1；可按 Win+Tab 切换，或改为所有桌面显示。", ToolTipIcon.Info);
+                        tray.ShowBalloonTip(2500, Program.ProductName, "伙伴已显示在桌面 1；可按 Win+Tab 切换，或改为所有桌面显示。", ToolTipIcon.Info);
                 }
                 catch { }
             }

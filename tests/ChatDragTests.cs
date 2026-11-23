@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 using System;
 using System.Drawing;
 using System.IO;
@@ -20,6 +20,24 @@ internal static class ChatDragTests
         try
         {
             Application.EnableVisualStyles();
+            using(var entry=new PromptForm())
+            {
+                entry.Show();Application.DoEvents();
+                var close=(Button)entry.Controls.Find("temporaryCloseButton",true)[0];
+                int historyRequests=0;entry.HistoryTodayRequested+=delegate{historyRequests++;};
+                var history=(Button)entry.Controls.Find("HistoryTodayButton",true)[0];history.PerformClick();
+                Check(historyRequests==1&&history.Top==143&&history.Left>=296&&history.Right<=entry.ClientSize.Width,"history action lives on the conversation footer and raises one request without a model call");
+                Directory.CreateDirectory(Program.StateDirectory);
+                foreach(string language in new[]{"zh-CN","en"})
+                {
+                    UiLanguage.Set(language);UiLanguageBindings.Apply(entry);
+                    using(var image=new Bitmap(entry.Width,entry.Height)){entry.DrawToBitmap(image,new Rectangle(0,0,entry.Width,entry.Height));image.Save(Path.Combine(Program.StateDirectory,"new-conversation-"+language+".png"));}
+                }
+                Check(close.Top<=12&&entry.ClientSize.Width-close.Right<=16&&close.Left>entry.ClientSize.Width/2,"new conversation close button is at the top right");
+                int margin=entry.ClientSize.Width-close.Right;entry.Width+=100;Application.DoEvents();
+                Check(entry.ClientSize.Width-close.Right==margin,"new conversation close button stays at the right edge after resizing");
+                close.PerformClick();Check(!entry.Visible&&!entry.IsDisposed,"top-right close hides the conversation without losing its draft");
+            }
             Rectangle desktop=new Rectangle(0,0,1920,1040);
             Rectangle middle=new Rectangle(900,120,96,104);
             ChatAnchorLayout centered=ChatAnchorLayout.Below(middle,new Size(640,650),desktop);
@@ -52,6 +70,25 @@ internal static class ChatDragTests
             {
                 pet.Show();Application.DoEvents();var form=(ActivityTrayForm)Field(pet,"activityTray");
                 Check(!HasRemovedMenu(pet.ContextMenuStrip.Items),"removed editor has no pet/tray menu entry");
+                var tray=(NotifyIcon)Field(pet,"tray");
+                Call(pet,"TrayMouseClick",tray,new MouseEventArgs(MouseButtons.Left,1,0,0,0));Application.DoEvents();
+                Check(tray.ContextMenuStrip==pet.ContextMenuStrip&&pet.ContextMenuStrip.Visible,"single left tray click opens the pet's shared settings menu");
+                pet.ContextMenuStrip.Close();Application.DoEvents();
+                var sizes=(ToolStripMenuItem)pet.ContextMenuStrip.Items["QuickPetSize"];
+                var reduced=(ToolStripMenuItem)pet.ContextMenuStrip.Items["QuickReduceMotion"];
+                var monitor=(ToolStripMenuItem)pet.ContextMenuStrip.Items["QuickMonitorExternal"];
+                Check(sizes==null&&reduced!=null&&monitor!=null,"size lives in Default settings; other frequent toggles stay direct");
+                bool retiredAbsent=true;foreach(ToolStripItem item in pet.ContextMenuStrip.Items)
+                    retiredAbsent&=!item.Text.Contains("PowerShell")&&item.Text!=UiLanguage.Text("历史上的今天");
+                Check(retiredAbsent,"retired and relocated actions are absent from the root menu");
+                Call(pet,"ShowDefaultSettings");var settings=(Form)Field(pet,"defaultSettingsWindow");
+                var scale=(ComboBox)settings.Controls.Find("CompanionScale",true)[0];
+                Check(scale.Items.Count==3&&Convert.ToString(scale.Items[0])=="75%"&&Convert.ToString(scale.Items[2])=="125%"&&scale.SelectedIndex==1,"settings expose three rebased size options with 100% default");
+                reduced.PerformClick();
+                Check(reduced.Checked==(bool)Field(pet,"reduceMotion")&&UiMotion.ReducedMotion==reduced.Checked&&((CheckBox)settings.Controls.Find("ReduceMotion",true)[0]).Checked==reduced.Checked,"quick reduced-motion toggle synchronizes rendering and the settings draft");
+                monitor.PerformClick();
+                Check(monitor.Checked==IntegrationPreferences.Load().MonitorExternalSessions&&((CheckBox)settings.Controls.Find("MonitorExternal",true)[0]).Checked==monitor.Checked,"quick external-session toggle is persisted and synchronized");
+                monitor.PerformClick();reduced.PerformClick();settings.Close();
                 Rectangle live=Screen.FromPoint(Cursor.Position).WorkingArea;
                 pet.Location=new Point(live.Left+live.Width/2-pet.Width/2,live.Top+40);form.ShowNear(pet.Bounds);Application.DoEvents();
                 Check(form.Top==pet.Bottom+8&&Math.Abs((form.Left*2+form.Width)-(pet.Left*2+pet.Width))<=1,"live dialog opens directly below actual pet");
@@ -65,6 +102,9 @@ internal static class ChatDragTests
                 // An oversized old arrangement is compacted onto the destination display on release.
                 Call(pet,"BeginChatGroupDrag");pet.Location=new Point(live.Left-1000,live.Top-1000);Call(pet,"FinishChatGroupDrag");Check(live.Contains(pet.Bounds)&&live.Contains(form.Bounds),"release repairs off-screen pair and keeps title/pet visible");
                 Call(pet,"BeginChatGroupDrag");Call(pet,"HidePet");Call(pet,"FinishChatGroupDrag");Check(!pet.Visible&&!form.Visible,"hiding during drag never reopens pet or conversation");
+                pet.ContextMenuStrip.Close();Application.DoEvents();
+                Call(pet,"TrayMouseClick",tray,new MouseEventArgs(MouseButtons.Left,1,0,0,0));Application.DoEvents();
+                Check(pet.ContextMenuStrip.Visible&&!pet.Visible,"tray settings remain available when the desktop pet is hidden (menu="+pet.ContextMenuStrip.Visible+", companion="+pet.Visible+")");pet.ContextMenuStrip.Close();
                 pet.Close();
             }
             Check(File.ReadAllText(legacyFile)=="{ malformed legacy file intentionally ignored","legacy preferences are ignored and never deleted or rewritten");

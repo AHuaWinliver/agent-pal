@@ -1,4 +1,4 @@
-# Companion specification
+﻿# Companion specification
 
 [简体中文](CHARACTER-SPEC.zh-CN.md)
 
@@ -49,12 +49,19 @@ Do not mix source pixels, 384×416 render coordinates and local UVs. Label anato
 ## Motion design
 
 - At least 24 unique walking phases, cycle timing and frame count:
+- Anatomical hand left/right → frontal screen left/right → profile near/far; mirrored mapping:
+- Frontal hanging-arm proof; palm, hand back and thumb orientation relative to the torso:
+- Head/torso/shoulder/elbow/wrist/palm proportions, trial arm scale and before/after comparison:
+- Single-character proportion approval and authorization to apply it to other companions:
+- Torso centerline, shoulder symmetry, sleeve-volume balance, actual collar center and neck alignment/occlusion evidence:
+- Straight low-swing walking extremes and evidence that the torso hides the far arm:
+- Wave/wipe outward elbows, actual hand contact and smooth return to hanging rest:
 - Stance/swing ratio, ground line, lift and stride:
 - Opposite arm/leg relationship, slight phase lag, arm amplitude and elbow range:
 - Velocity/cadence response, stopping, turns and loop seam:
 - Subtle body and neck inertia:
 - Diagonal quadruped support, if applicable:
-- Outermost arms/front limbs:
+- Gesture foreground and walking far arm → torso → near arm layering:
 
 | States | Pose range and intent | Entry/exit to stance | Review result |
 | --- | --- | --- | --- |
@@ -88,7 +95,12 @@ Do not mix source pixels, 384×416 render coordinates and local UVs. Label anato
 - Focused tests, evidence and unverified cases:
 - Standing, both walking directions, frame-by-frame loop and performance previews:
 - Attachment/layer/alpha/clipping/proportion/expression/multi-monitor review:
+- Whole-character hand-orientation review, not only isolated sleeve/hand crops:
+- Adjacent fragment, tassel and embroidery checks; shoulder/elbow/wrist/palm landmarks:
 - Visual reviewer and date:
 - Approval to package the reviewed images:
 
 Include rebuildable inputs. Exclude private settings, chat, secrets and unlicensed material.
+
+- Clothing-only body-layer proof; source neck, visible opening, buried anchor, skin sample, overlap depth and local feather width:
+- Per-character calibration (see `art/anatomy-calibration.json`); separate humanoid proportions from quadruped shell sockets:

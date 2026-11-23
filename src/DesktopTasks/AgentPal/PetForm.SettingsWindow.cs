@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+﻿// SPDX-License-Identifier: Apache-2.0
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -16,7 +16,7 @@ namespace AgentPal
         {
             if (defaultSettingsWindow != null && !defaultSettingsWindow.IsDisposed)
             { defaultSettingsWindow.Show(); defaultSettingsWindow.Activate(); return; }
-            var window = new Form { Name = "DefaultSettingsWindow", Text = UiLanguage.Text("Default settings"), ClientSize = new Size(720, 540),
+            var window = new AppWindow { Name = "DefaultSettingsWindow", Text = UiLanguage.Text("Default settings"), ClientSize = new Size(720, 540),
                 MinimumSize = new Size(650, 510), StartPosition = FormStartPosition.CenterScreen,
                 Icon = AppIcon.WindowIcon, Font = UiText.Font(9.5f), BackColor = Color.FromArgb(250, 250, 248) };
             if (Environment.GetEnvironmentVariable("AGENT_PAL_TEST_MODE") == "1")
@@ -24,7 +24,7 @@ namespace AgentPal
             defaultSettingsWindow = window;
             var tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(12, 8) };
             var general = SettingsPage(tabs, "General");
-            var profilesPage = SettingsPage(tabs, "Companions");
+            var profilesPage = SettingsPage(tabs, "Agent");
             var appearance = SettingsPage(tabs, "Appearance");
             var behavior = SettingsPage(tabs, "Behavior");
             var language = new ComboBox { Name = "InterfaceLanguage", DropDownStyle = ComboBoxStyle.DropDownList, Width = 250 };
@@ -34,8 +34,14 @@ namespace AgentPal
             var startup = SettingsCheck(general, "Start at login", IsStartupEnabled());
             var onTop = SettingsCheck(general, "Keep on top", TopMost);
             var monitor = SettingsCheck(general, "Monitor external Claude sessions (off by default)", integrationPreferences.MonitorExternalSessions);
+            monitor.Name="MonitorExternal";
+            var integrationTip=new ToolTip();integrationTip.SetToolTip(monitor,UiLanguage.Text("外部会话需已有联动桥接；此开关只接收事件，不安装 Hooks，也不修改 Claude 配置。"));
+            window.Disposed+=delegate{integrationTip.Dispose();};
             var work = new TextBox { Name = "DefaultWorkingDirectory", Text = promptForm.WorkingDirectory, Width = 350 };
             SettingsRow(general, "Default Claude working directory", SettingsPicker(work, true, false));
+            var quickCommands=new Button {Text=UiLanguage.Text("管理右键快捷任务…"),AutoSize=true,Margin=new Padding(12)};
+            quickCommands.Click+=delegate{try{using(var dialog=new QuickCommandsForm())dialog.ShowDialog(window);}catch(Exception error){MessageBox.Show(window,error.Message,Program.ProductName);}};
+            general.Controls.Add(quickCommands);
             var visibility = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
             visibility.Items.AddRange(new object[] { UiLanguage.Text("All virtual desktops"), UiLanguage.Text("Desktop 1 only") });
             visibility.SelectedIndex = desktopScope == "first" ? 1 : 0;
@@ -49,7 +55,7 @@ namespace AgentPal
             scope.Items.AddRange(names.ToArray());
             var executable = new TextBox { Name = "ClaudeExecutable", Width = 350 };
             var configuration = new TextBox { Name = "ClaudeSettings", Width = 350 };
-            SettingsRow(profilesPage, "Companions", scope);
+            SettingsRow(profilesPage, "Agent", scope);
             SettingsRow(profilesPage, "Claude executable", SettingsPicker(executable, false, false));
             SettingsRow(profilesPage, "Claude settings file", SettingsPicker(configuration, false, true));
             profilesPage.Controls.Add(new Label { Text = UiLanguage.Text("Leave a field empty to inherit the global value. Empty global fields use Claude's defaults."),
@@ -78,15 +84,19 @@ namespace AgentPal
             };
             scope.SelectedIndex = Math.Max(0, profileIds.IndexOf(currentCharacterId));
 
-            var scale = new NumericUpDown { Minimum = 50, Maximum = 125, Increment = 5, Value = (decimal)(petScale * 100), Width = 150 };
+            var scale = new ComboBox {DropDownStyle=ComboBoxStyle.DropDownList,Width=150};
+            foreach(int percent in PetScalePercentages)scale.Items.Add(percent+"%");
+            scale.SelectedIndex=Array.IndexOf(PetScalePercentages,PetScalePercent(petScale));
+            scale.Name="CompanionScale";
             var dock = new NumericUpDown { Name = "DockedOpacity", Minimum = 20, Maximum = 100, Value = dockOpacityPercent, Width = 150 };
             var trail = new NumericUpDown { Minimum = 0, Maximum = 100, Value = (decimal)(trailOpacity * 100), Width = 150 };
             SettingsRow(appearance, "Companion size", scale);
             SettingsRow(appearance, "Docked opacity", dock);
             SettingsRow(appearance, "Trail opacity", trail);
             var reduced = SettingsCheck(appearance, "Reduce motion", reduceMotion);
+            reduced.Name="ReduceMotion";
             var reset = new Button { Text = UiLanguage.Text("Reset size and position"), AutoSize = true, Margin = new Padding(12) };
-            reset.Click += delegate { SetPetScale(0.5f, false); ResetPosition(); SavePreferences(); scale.Value = 50; };
+            reset.Click += delegate { SetPetScale(0.5f, false); ResetPosition(); SavePreferences(); scale.SelectedIndex = 1; };
             appearance.Controls.Add(reset);
             var care = SettingsCheck(behavior, "Allow proactive messages and break reminders", aiCareEnabled);
             var minutes = new NumericUpDown { Minimum = 5, Maximum = 240, Value = breakReminderMinutes, Width = 150 };
@@ -121,7 +131,8 @@ namespace AgentPal
                     if (startup.Checked != IsStartupEnabled()) SetStartup(startup.Checked);
                     TopMost = onTop.Checked; dockOpacityPercent = (int)dock.Value; trailOpacity = (float)trail.Value / 100;
                     reduceMotion = reduced.Checked;
-                    SetPetScale((float)scale.Value / 100, true);
+                    UiMotion.ReducedMotion=reduceMotion;
+                    SetPetScale(DefaultPetScale*PetScalePercentages[Math.Max(0,scale.SelectedIndex)]/100f,true);
                     bool careChanged = aiCareEnabled != care.Checked || breakReminderMinutes != (int)minutes.Value;
                     aiCareEnabled = care.Checked; breakReminderMinutes = (int)minutes.Value;
                     string pathMode = paths.SelectedIndex == 1 ? "ai" : "builtin";
